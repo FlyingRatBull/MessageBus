@@ -6,7 +6,6 @@ set(APPNAME "${CMAKE_PROJECT_NAME}")
 set(SOURCES
 	localserver.cpp
 	localsocket.cpp
-	localsocketprivate_unix.cpp
 	
 	messagebus.cpp
 	messagebus_p.cpp
@@ -19,8 +18,9 @@ set(SOURCES
 set(HEADERS
 	localserver.h
 	localsocket.h
-	localsocketprivate_unix.h
-	
+	# Don't include here, it's just an template for new implementations
+# 	localsocketprivate.h
+
 	messagebus.h
 # 	messagebus_p.h
 	messagebusinterface.h
@@ -31,6 +31,23 @@ set(HEADERS
 # 	tsqueue.h
 # 	variant.h
 	)
+
+# OS specific implementations
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+	set(SOURCES ${SOURCES}
+		# Unix implementation
+		localsocketprivate_unix.cpp
+		localsocketprivate_unix_worker.cpp
+		)
+	
+	set(HEADERS ${HEADERS}
+		# Unix implementation
+		localsocketprivate_unix.h
+		localsocketprivate_unix_worker.h
+		)
+else()
+	message(FATAL_ERROR "No local socket implementation for ${CMAKE_SYSTEM_NAME}!")
+endif()
 
 set(FORMS
 	)
@@ -49,13 +66,8 @@ target_link_libraries("${APPNAME}" ${QT_QTCORE_LIBRARY}
 	#${QT_QTSQL_LIBRARY}
 # 	${QT_QTNETWORK_LIBRARY}
 	)
-	
-add_custom_command(TARGET "${APPNAME}"
-	POST_BUILD
-	COMMAND "${PROJECT_SOURCE_DIR}/raise_version.sh"
-	WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-	)
-	
+
+
 install(TARGETS "${APPNAME}"
 	RUNTIME DESTINATION ${EXECUTABLE_INSTALL_PATH}
 	LIBRARY DESTINATION ${LIBRARY_INSTALL_PATH}

@@ -28,23 +28,11 @@ target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
 set(APPNAME "test_localsocket")
 
 set(SOURCES
-	../localserver.cpp
-	../localsocket.cpp
-	../localsocketprivate_unix.cpp
-	../tools.cpp
-	
 	testlocalsocket.cpp
 	testlocalsocket_peer.cpp
 	)
 
 set(HEADERS
-	../localserver.h
-	../localsocket.h
-	../localsocketprivate_unix.h
-	../tsdataqueue.h
-	../tsqueue.h
-	../tools.h
-	
 	testlocalsocket.h
 	testlocalsocket_peer.h
 	)
@@ -53,7 +41,7 @@ set(MOC_SRCS)
 QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY} ${CMAKE_PROJECT_NAME})
 # 
 # set(SOURCES
 # 	testlocalsocket_external_peer.cpp
@@ -75,32 +63,11 @@ target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${
 set(APPNAME "test_messagebus")
 
 set(SOURCES
-	../localserver.cpp
-	../localsocket.cpp
-	../localsocketprivate_unix.cpp
-	../tools.cpp
-	../variant.cpp
-	../messagebus.cpp
-	../messagebus_p.cpp
-	../messagebusinterface.cpp
-	
 	testmessagebus.cpp
 	testmessagebus_peer.cpp
 	)
 
 set(HEADERS
-	../localserver.h
-	../localsocket.h
-	../localsocketprivate_unix.h
-	../tsdataqueue.h
-	../tsqueue.h
-	../tools.h
-	../variant.h
-	../messagebus.h
-#	../messagebus_p.h
-	../messagebusinterface.h
-	../messagebusinterface_p.h
-	
 	testmessagebus.h
 	testmessagebus_peer.h
 	)
@@ -109,4 +76,4 @@ set(MOC_SRCS)
 QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY}  ${CMAKE_PROJECT_NAME})

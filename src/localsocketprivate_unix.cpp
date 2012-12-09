@@ -14,6 +14,19 @@
 
 #include "localsocketprivate_unix.h"
 
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <limits>
+#include <cstdio>
+#include <errno.h>
+#include <poll.h>
+
+#include "localsocketprivate_unix_worker.h"
+
 LocalSocketPrivate::LocalSocketPrivate(LocalSocket * q)
 	:	q_ptr(q), w(0), m_socket(0)
 {
@@ -49,20 +62,7 @@ void LocalSocketPrivate::setSocketDescriptor(int socketDescriptor)
 
 void LocalSocketPrivate::notifyWrite()
 {
-// 	while(!isRunning());
-	
 	QTimer::singleShot(0, w, SLOT(write()));
-// 	callSlotQueued(w, "write");
-	
-// 	callSlotQueued(&(w->m_writeNotifier), "setEnabled", Q_ARG(bool, true));
-// 			w->m_writeNotifier.setEnabled(true);
-}
-
-
-void LocalSocketPrivate::notifyWriteSocketDescriptor()
-{
-// 			callSlotQueued(this, "writeSocketDescriptors");
-// 	w->m_writeNotifier.setEnabled(true);
 }
 
 
@@ -241,6 +241,13 @@ void LocalSocketPrivate::writePackage(const QByteArray& package)
 	
 	writeBuffer.enqueue(data);
 	
+	notifyWrite();
+}
+
+
+void LocalSocketPrivate::writeSocketDescriptor(int socketDescriptor)
+{
+	writeSDescBuffer.enqueue(socketDescriptor);
 	notifyWrite();
 }
 

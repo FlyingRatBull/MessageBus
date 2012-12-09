@@ -1,24 +1,25 @@
-// Copyright 2012 Oliver Becker <der.ole.becker@gmail.com>
-// 
-// This file is part of the MessageBus project,
-// 
-// MessageBus is free software: you can redistribute it and/or modify it
-// under the terms of the GNU General Public License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any later version.
-// MessageBus is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License along with MessageBus.
-// If not, see http://www.gnu.org/licenses/.
+/*
+ *  MessageBus - Inter process communication library
+ *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ * 
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ * 
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ * 
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "localsocket.h"
 
-#if (defined Q_OS_LINUX || defined Q_OS_UNIX)
-	#include "localsocketprivate_unix.h"
-#else
-	#error No implementation for LocalSocket!
-#endif
+#include "localsocketprivate.h"
+
 
 LocalSocket::LocalSocket(const QString& identifier, QObject * parent)
 	:	QIODevice(parent), d_ptr(new LocalSocketPrivate(this))
@@ -143,8 +144,7 @@ bool LocalSocket::writeSocketDescriptor(int socketDescriptor)
 	
 	Q_D(LocalSocket);
 	
-	d->writeSDescBuffer.enqueue(socketDescriptor);
-	d->notifyWrite();
+	d->writeSocketDescriptor(socketDescriptor);
 	
 	return true;
 }
@@ -160,7 +160,6 @@ qint64 LocalSocket::writeData(const char *data, qint64 len)
 	
 	Q_D(LocalSocket);
 
-	///@todo Implement LocalSocketPrivate::writeData(const char *, qint64)
 	d->writeData(QByteArray(data, len));
 	
 	return len;

@@ -16,35 +16,28 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LOCALSOCKETPRIVATE_H
-#define LOCALSOCKETPRIVATE_H
 
-#include <QtCore/QThread>
 #include <QtCore/QString>
 #include <QtCore/QIODevice>
-#include <QtCore/QByteArray>
-
-#include "localsocket.h"
-#include "localsocketprivate.h"
+#include <QtCore/QThread>
 
 #include "tsqueue.h"
 #include "tsdataqueue.h"
+#include "tools.h"
 
+#include "localsocket.h"
 
-class LocalSocketPrivate_Worker;
+#define CMD_DATA		0x10
+#define CMD_PKG			0x11
+#define CMD_PKG_END	0x12
+#define CMD_SOCK		0x13
+
+#ifndef LOCALSOCKETPRIVATE_H
+#define LOCALSOCKETPRIVATE_H
 
 class LocalSocketPrivate : public QThread
 {
 	Q_OBJECT
-	
-	friend class LocalSocketPrivate_Worker;
-	
-	struct Header
-	{
-		quint32		cmd;
-		quint32		size;
-	};
-#define INIT_HEADER(_header) {_header.cmd=0;_header.size=0;}
 	
 	public:
 		TsDataQueue							readBuffer;
@@ -56,27 +49,19 @@ class LocalSocketPrivate : public QThread
 		
 		LocalSocketPrivate(LocalSocket * q);
 		
-		virtual ~LocalSocketPrivate();
-		
 		void setSocketFilename(const QString& socketFilename);
 		
 		void setSocketDescriptor(int socketDescriptor);
 		
-// 		void notifyWrite();
-// 		
-// 		void notifyWritePackage();
-// 		
-// 		void notifyWriteSocketDescriptor();
-		
-		bool open(QIODevice::OpenMode mode);
-		
-		void close();
-		
-		void writeData(const QByteArray& package);
+		void writeData(const QByteArray& data);
 		
 		void writePackage(const QByteArray& package);
 		
 		void writeSocketDescriptor(int socketDescriptor);
+		
+		bool open(QIODevice::OpenMode mode);
+		
+		void close();
 		
 	signals:
 		void readyRead();
@@ -88,23 +73,13 @@ class LocalSocketPrivate : public QThread
 		void disconnected();
 		
 	protected:
-		virtual void run();
+		struct Header
+		{
+			quint32		cmd;
+			quint32		size;
+		};
 		
-	private slots:
-		void doClose();
-		
-		void notifyWrite();
-		
-	private:
-		LocalSocket		*	const	q_ptr;
-		Q_DECLARE_PUBLIC(LocalSocket);
-		
-		LocalSocketPrivate_Worker	*	w;
-		
-		int							m_socket;
-		int							m_maxSendPackageSize;
-		int							m_socketReadBufferSize;
-		QString					m_socketFilename;
+		#define INIT_HEADER(_header) {_header.cmd=0;_header.size=0;}
 };
 
 #endif // LOCALSOCKETPRIVATE_H
