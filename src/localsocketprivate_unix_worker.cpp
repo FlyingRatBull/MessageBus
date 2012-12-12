@@ -36,14 +36,12 @@
 LocalSocketPrivate_Worker::LocalSocketPrivate_Worker(LocalSocketPrivate * pp)
 :	QObject(0), p(pp), run(true), m_readNotifier(pp->m_socket, QSocketNotifier::Read, this)
 , m_writeNotifier(pp->m_socket, QSocketNotifier::Write, this)
-, m_excNotifier(pp->m_socket, QSocketNotifier::Exception, this)
 , m_tmpData(pp->m_socketReadBufferSize, (char)0)
 , m_writeBytesTillNewPackage(0)
 , m_reveivingSocket(false)
 {
 	connect(&m_readNotifier, SIGNAL(activated(int)), SLOT(read()), Qt::DirectConnection);
 	connect(&m_writeNotifier, SIGNAL(activated(int)), SLOT(write()));
-	connect(&m_excNotifier, SIGNAL(activated(int)), SLOT(exception()), Qt::BlockingQueuedConnection);
 	
 	m_writeNotifier.setEnabled(false);
 	
@@ -71,7 +69,7 @@ void LocalSocketPrivate_Worker::read()
 	
 	if(!run)
 	{
-		p->close();
+		p->exception();
 		return;
 	}
 	
@@ -81,7 +79,7 @@ void LocalSocketPrivate_Worker::read()
 	
 	if(!run)
 	{
-		p->close();
+		p->exception();
 		return;
 	}
 	
@@ -101,9 +99,9 @@ bool LocalSocketPrivate_Worker::readImpl()
 	O_Q;
 	
 	#define SAFE_READ(_target, _size) int read=0;int tmp=::read(p->m_socket,_target,(_size));if(tmp>0)read=tmp;
-	#define SAFE_READ_FIRST(_target, _size) int tmp=::read(p->m_socket,_target,(_size));if(tmp>0 && tmp<_size){run=false;m_readNotifier.setEnabled(false);emit(aborted());return false;}
+	#define SAFE_READ_FIRST(_target, _size) int tmp=::read(p->m_socket,_target,(_size));if(tmp>0 && tmp<_size){m_readNotifier.setEnabled(false);p->exception();return false;}
 	
-	#define CHECK_TMP_READ(READ_MSG) if(tmp==0||errno==EBADF){run=false;m_readNotifier.setEnabled(false);emit(aborted());return false;}else if(tmp<0 && !(errno==EAGAIN || errno==EWOULDBLOCK)){perror("LocalSocket: Error when reading " READ_MSG ": ");run=false;emit(aborted());return false;}
+	#define CHECK_TMP_READ(READ_MSG) if(tmp==0||errno==EBADF){m_readNotifier.setEnabled(false);p->exception();return false;}else if(tmp<0 && !(errno==EAGAIN || errno==EWOULDBLOCK)){perror("LocalSocket: Error when reading " READ_MSG ": ");p->exception();return false;}
 	
 	// Check whether to read header
 	if(m_readHeader.cmd == 0)
@@ -134,8 +132,8 @@ bool LocalSocketPrivate_Worker::readImpl()
 	if(!m_readHeader.size || m_readHeader.size > p->m_socketReadBufferSize)
 	{
 		m_readNotifier.setEnabled(false);
-		run=false;
-		emit(aborted());
+		
+		p->exception();
 		return false;
 	}
 	
@@ -196,8 +194,9 @@ bool LocalSocketPrivate_Worker::readImpl()
 			{
 				qDebug("Expected size: %d; size: %d", pkgSize, m_tmpPkg.size());
 				fprintf(stderr, "LocalSocket: Error when reading package!\n");
-				run=false;
-				emit(aborted());
+				
+				p->exception();
+				return false;
 			}
 			
 			p->readPkgBuffer.enqueue(m_tmpPkg);
@@ -258,8 +257,8 @@ bool LocalSocketPrivate_Worker::readImpl()
 			else if(rv < 1)
 			{
 				perror("LocalSocket: Error when reading socket descriptor");
-				run=false;
-				emit(aborted());
+				
+				p->exception();
 				return false;
 			}
 			
@@ -290,8 +289,9 @@ bool LocalSocketPrivate_Worker::readImpl()
 		default:
 		{
 			fprintf(stderr, "LocalSocket: Error reading command from socket (Unexpected command: 0x%08X)!\n", m_readHeader.cmd);
-			run=false;
-			emit(aborted());
+			
+			p->exception();
+			return false;
 		}break;
 	}
 	
@@ -302,20 +302,11 @@ bool LocalSocketPrivate_Worker::readImpl()
 }
 
 
-void LocalSocketPrivate_Worker::exception()
-{
-	O_Q;
-	
-	q->close();
-	emit(aborted());
-}
-
-
 void LocalSocketPrivate_Worker::write()
 {
 	#define SAFE_WRITE(_source, _size) int written=0;int tmp=::write(p->m_socket,(const char*)(_source),(_size));if(tmp>0)written=tmp;
 	
-	#define CHECK_TMP_WRITE(WRITE_MSG) if(tmp==0||errno==EBADF){emit(aborted());run=false;return false;}else if(tmp<0 && !(errno==EAGAIN || errno==EWOULDBLOCK)){perror("LocalSocket: Error when writing " WRITE_MSG);run=false;emit(aborted());return false;}
+	#define CHECK_TMP_WRITE(WRITE_MSG) if(tmp==0||errno==EBADF){p->exception();return false;}else if(tmp<0 && !(errno==EAGAIN || errno==EWOULDBLOCK)){perror("LocalSocket: Error when writing " WRITE_MSG);p->exception();return false;}
 	
 	// 			qDebug("write!");
 	
@@ -384,8 +375,8 @@ bool LocalSocketPrivate_Worker::writeData()
 			if(written && p->writeBuffer.discard(written) < written)
 			{
 				fprintf(stderr, "LocalSocket: Error when discarding data!\n");
-				run=false;
-				emit(aborted());
+				
+				p->exception();
 				return false;
 			}
 			
@@ -475,8 +466,8 @@ bool LocalSocketPrivate_Worker::writeSocketDescriptors()
 	if(rv < 1)
 	{
 		fprintf(stderr, "LocalSocket: Error when writing socket descriptor!");
-		run=false;
-		emit(aborted());
+		
+		p->exception();
 		return true;
 	}
 	else

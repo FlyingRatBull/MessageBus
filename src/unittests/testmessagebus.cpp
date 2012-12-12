@@ -323,40 +323,40 @@ void TestMessageBus::callBenchmark()
 }
 
 
-void TestMessageBus::callHeavy()
-{
-	QFETCH(QList<QList<Variant> >, args);
-	int	calls	=	0;
-	
-	for(int i = 0; i < 1000; i++)
-	{
-		for(int j = 0; j < args.count(); j++)
-		{
-			m_bus->call("fdCall", args[j][0], args[j][1]);
-			calls++;
-		}
-	}
-	
-	int	i	=	0;
-	while(m_peer->numCalls < calls && i++ < 50)
-		QTest::qWait(100);
-	
-	QVERIFY2(m_peer->passedArgs.count() == args.count(), "Invalid number of arguments received");
-	
-	for(int i = 0; i < m_peer->passedArgs.count(); i++)
-		QVERIFY2(m_peer->passedArgs[i] == args[i], "Invalid arguments received");
-	
-	// Delete temp files
-	for(int j = 0; j < args.count(); j++)
-	{
-		QString	filename;
-		QFile		fdFile(QString("/proc/self/fd/%1").arg(args[j][1]));
-		filename	=	fdFile.readAll();
-		
-		close(args[1]);
-		QFile::remove(filename);
-	}
-}
+// void TestMessageBus::callHeavy()
+// {
+// 	QFETCH(QList<QList<Variant> >, args);
+// 	int	calls	=	0;
+// 	
+// 	for(int i = 0; i < 1000; i++)
+// 	{
+// 		for(int j = 0; j < args.count(); j++)
+// 		{
+// 			m_bus->call("fdCall", args[j][0], args[j][1]);
+// 			calls++;
+// 		}
+// 	}
+// 	
+// 	int	i	=	0;
+// 	while(m_peer->numCalls < calls && i++ < 50)
+// 		QTest::qWait(100);
+// 	
+// 	QVERIFY2(m_peer->passedArgs.count() == args.count(), "Invalid number of arguments received");
+// 	
+// 	for(int i = 0; i < m_peer->passedArgs.count(); i++)
+// 		QVERIFY2(m_peer->passedArgs[i] == args[i], "Invalid arguments received");
+// 	
+// 	// Delete temp files
+// 	for(int j = 0; j < args.count(); j++)
+// 	{
+// 		QString	filename;
+// 		QFile		fdFile(QString("/proc/self/fd/%1").arg(args[j][1]));
+// 		filename	=	fdFile.readAll();
+// 		
+// 		close(args[1]);
+// 		QFile::remove(filename);
+// 	}
+// }
 
 
 void TestMessageBus::callVoid_data()
@@ -419,26 +419,26 @@ void TestMessageBus::callArgs(int num)
 }
 
 
-void TestMessageBus::callHeavy_data()
-{
-	QTest::addColumn<QList<QList<Variant> > >("args");
-	QList<QList<Variant> >	args;
-	
-	for(int i = 0; i < 10; i++)
-	{
-		QList<Variant>	params;
-
-		QTemporaryFile	file;
-		file.setAutoRemove(false);
-		params.append(file.fileName());		// Path
-		int	fd	=	fopen(file.fileName(), "r");
-		params.append(Variant::fromSocketDescriptor(fd));
-		
-		args.append(params);
-	}
-	
-	QTest::newRow("heavy fd") << args;
-}
+// void TestMessageBus::callHeavy_data()
+// {
+// 	QTest::addColumn<QList<QList<Variant> > >("args");
+// 	QList<QList<Variant> >	args;
+// 	
+// 	for(int i = 0; i < 10; i++)
+// 	{
+// 		QList<Variant>	params;
+// 
+// 		QTemporaryFile	file;
+// 		file.setAutoRemove(false);
+// 		params.append(file.fileName());		// Path
+// 		int	fd	=	fopen(file.fileName(), "r");
+// 		params.append(Variant::fromSocketDescriptor(fd));
+// 		
+// 		args.append(params);
+// 	}
+// 	
+// 	QTest::newRow("heavy fd") << args;
+// }
 
 
 void TestMessageBus::callArgs_random(int num)

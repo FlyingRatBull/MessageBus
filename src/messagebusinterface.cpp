@@ -41,6 +41,12 @@ bool MessageBusInterface::isValid() const
 }
 
 
+void MessageBusInterface::setReceiver(QObject *obj)
+{
+	d->setReceiver(obj);
+}
+
+
 QStringList			MessageBusInterfacePrivate::s_sockets;
 
 

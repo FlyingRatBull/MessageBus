@@ -18,7 +18,11 @@
 
 #include "localsocket.h"
 
-#include "localsocketprivate.h"
+#ifdef Q_OS_LINUX || Q_OS_UNIX
+	#include "localsocketprivate_unix.h"
+#else
+	#error No include for this operating system!
+#endif
 
 
 LocalSocket::LocalSocket(const QString& identifier, QObject * parent)

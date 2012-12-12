@@ -35,14 +35,18 @@ class MessageBus : public QObject
 	friend class MessageBusInterfacePrivate;
 
 	public:
-		MessageBus(const QString& service, const QString& object, QObject * parent);
+		MessageBus(const QString& service, const QString& object, QObject * parent = 0);
 
 		virtual ~MessageBus();
 
 		///@warning callRet() must not be called within a function that is called by callRet() itself!
 		Variant callRet(const QString& slot, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant());
 		
+		Variant callRet(const QString& slot, qint64 timeout, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant());
+		
 		Variant callRet(const QString& slot, const QList<Variant>& args);
+		
+		Variant callRet(const QString& slot, qint64 timeout, const QList<Variant>& args);
 
 		void call(const QString& slot, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant(), const Variant& var5 = Variant());
 		
@@ -54,11 +58,15 @@ class MessageBus : public QObject
 		
 		bool isOpen() const;
 		
+		void setReceiver(QObject * obj);
+		
 	signals:
 		void disconnected();
 		
 	private slots:
 		void onNewPackage();
+		
+		void onNewSocketDescriptor();
 		
 		void onDisconnected();
 		

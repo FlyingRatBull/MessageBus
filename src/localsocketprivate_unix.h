@@ -78,6 +78,8 @@ class LocalSocketPrivate : public QThread
 		
 		void writeSocketDescriptor(int socketDescriptor);
 		
+		void exception();
+		
 	signals:
 		void readyRead();
 		

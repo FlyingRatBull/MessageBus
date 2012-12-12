@@ -176,7 +176,8 @@ void TestMessageBus_Peer::setOrg(MessageBus *org)
 
 void TestMessageBus_Peer::run()
 {
-	MessageBusInterface	*	i	=	new MessageBusInterface("MessageBusTest", "/i", this);
+	MessageBusInterface	*	i	=	new MessageBusInterface("MessageBusTest", "/i");
+	i->setReceiver(this);
 	
 	connect(i, SIGNAL(newConnection(MessageBus*)), SLOT(setOrg(MessageBus*)));
 	

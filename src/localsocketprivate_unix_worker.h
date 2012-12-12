@@ -32,6 +32,7 @@ class LocalSocketPrivate_Worker	:	public QObject
 	
 	public:
 		QSocketNotifier					m_writeNotifier;
+		bool										run;
 		
 		LocalSocketPrivate_Worker(LocalSocketPrivate * pp);
 		
@@ -39,15 +40,10 @@ class LocalSocketPrivate_Worker	:	public QObject
 		
 		void init();
 		
-	signals:
-		void aborted();
-		
 	private slots:
 		void read();
 		
 		bool readImpl();
-		
-		void exception();
 		
 		void write();
 		
@@ -57,10 +53,8 @@ class LocalSocketPrivate_Worker	:	public QObject
 		
 	private:
 		LocalSocketPrivate		*	p;
-		bool										run;
 		
 		QSocketNotifier					m_readNotifier;
-		QSocketNotifier					m_excNotifier;
 		
 		quint32									m_writeBytesTillNewPackage;
 		

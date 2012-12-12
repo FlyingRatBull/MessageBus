@@ -28,7 +28,9 @@
 #include "localsocketprivate_unix_worker.h"
 
 LocalSocketPrivate::LocalSocketPrivate(LocalSocket * q)
-	:	q_ptr(q), w(0), m_socket(0)
+	:	q_ptr(q),
+	w(0),
+	m_socket(0)
 {
 	setObjectName("Thread: LocalSocketPrivate");
 	
@@ -43,6 +45,9 @@ LocalSocketPrivate::~LocalSocketPrivate()
 	if(QThread::isRunning())
 	{
 		QThread::terminate();
+		
+		Q_ASSERT_X(currentThread() != qobject_cast<QThread*>(this), __FILE__, "Close must not be called from the running private thread!");
+
 		QThread::wait();
 	}
 }
@@ -139,8 +144,11 @@ void LocalSocketPrivate::close()
 	
 	QThread::exit(0);
 	
-	if(currentThread() != this)
+	if(currentThread() != qobject_cast<QThread*>(this))
 		QThread::wait();
+	else
+		// Use sleep so run() can quit properly
+		sleep(1);
 }
 
 
@@ -252,13 +260,18 @@ void LocalSocketPrivate::writeSocketDescriptor(int socketDescriptor)
 }
 
 
+void LocalSocketPrivate::exception()
+{
+	w->run	=	false;
+	quit();
+}
+
+
 void LocalSocketPrivate::run()
 {
 	Q_Q(LocalSocket);
 	LocalSocketPrivate_Worker	worker(this);
 	w	=	&worker;
-	
-	connect(w, SIGNAL(aborted()), SLOT(quit()), Qt::DirectConnection);
 	
 	w->init();
 	

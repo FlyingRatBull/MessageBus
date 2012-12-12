@@ -30,8 +30,7 @@ enum Command
 	CallSlot			=	0x01,
 	CallSlotRet		=	0x02,
 	CallRetVal		=	0x03,			// Return value from CallSlotRet
-	SafeCall			=	0x04,			// Call which returns fater properly being received by peer; For socket sending
-	SafeCallRet		=	0x05			// Return signal for SafeCall
+	CallRecv				=	0x04			// Call was received
 };
 
 

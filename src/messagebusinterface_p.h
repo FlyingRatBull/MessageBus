@@ -64,6 +64,19 @@ class MessageBusInterfacePrivate : public LocalServer
 
 			return false;
 		}
+		
+		
+		void setReceiver(QObject * obj)
+		{
+			object	=	obj;
+			
+			foreach(MessageBus * bus, m_clients)
+			{
+				// Only call setReceiver if message bus is still valid
+				if(qobject_cast<MessageBus*>(bus))
+					bus->setReceiver(obj);
+			}
+		}
 
 
 	protected:
@@ -73,6 +86,7 @@ class MessageBusInterfacePrivate : public LocalServer
 			LocalSocket	*	socket	=	new LocalSocket(socketDescriptor, this);
 
 			MessageBus	*	bus	=	new MessageBus(object, socket, this);
+			m_clients.append(bus);
 
 			emit(p->newConnection(bus));
 		}
@@ -80,7 +94,9 @@ class MessageBusInterfacePrivate : public LocalServer
 
 	public:
 		MessageBusInterface		*	p;
-		QObject						*	object;
+		QObject								*	object;
+		
+		QList<MessageBus*>			m_clients;
 
 	public:
 		static QStringList				s_sockets;

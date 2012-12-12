@@ -33,11 +33,13 @@ class MessageBusInterface : public QObject
 	friend class MessageBusInterfacePrivate;
 
 	public:
-		MessageBusInterface(const QString service, const QString& object, QObject * obj);
+		MessageBusInterface(const QString service, const QString& object, QObject * obj = 0);
 
 		virtual ~MessageBusInterface();
 
 		bool isValid() const;
+		
+		void setReceiver(QObject * obj);
 		
 	signals:
 		void newConnection(MessageBus * msgBus);

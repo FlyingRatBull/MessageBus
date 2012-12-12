@@ -86,7 +86,7 @@ class TestMessageBus : public QObject
 		
 		void callBenchmark();
 		
-		void callHeavy();
+// 		void callHeavy();
 		
 		// Data
 		void callVoid_data();
@@ -107,7 +107,7 @@ class TestMessageBus : public QObject
 		
 		void callRet_3_data();
 		
-		void callHeavy_data();
+// 		void callHeavy_data();
 		
 	private:
 		void callArgs(int num);
