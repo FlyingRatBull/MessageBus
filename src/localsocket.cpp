@@ -18,10 +18,10 @@
 
 #include "localsocket.h"
 
-#ifdef Q_OS_LINUX || Q_OS_UNIX
+#if defined Q_OS_LINUX || defined Q_OS_UNIX
 	#include "localsocketprivate_unix.h"
 #else
-	#error No include for this operating system!
+	#error No implementation of LocalSocket for this operating system!
 #endif
 
 
