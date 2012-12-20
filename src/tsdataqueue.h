@@ -213,22 +213,21 @@ class TsDataQueue
 			// Respect part size if needed
 			if(m_partSize > 0)
 			{
-				i					=	m_tail;
 				int	pos		=	0;
-				int	iSize	=	i->m_data->size();
+				int	iSize	=	m_tail->m_data->size();
 				
 				while(pos < size)
 				{
 					if(iSize < m_partSize)
 					{
-						i->m_data->append(data + pos, m_partSize - iSize);
+						m_tail->m_data->append(data + pos, m_partSize - iSize);
 						pos	+=	(m_partSize - iSize);
 						iSize	=	m_partSize;
 					}
 					else
 					{
-						TsDataQueueItem	*	i			=	new TsDataQueueItem(data + pos, MIN(size - pos, m_partSize));
-						iSize	=		p->m_data->size();
+						TsDataQueueItem	*	i			=	new TsDataQueueItem(data + pos, MIN((quint32)size - pos, m_partSize));
+						iSize	=		i->m_data->size();
 						pos		+=	iSize;
 						
 						m_tail->next	=	i;
@@ -293,18 +292,18 @@ class TsDataQueue
 		}
 		
 		
-		TsDataQueue_ByteArray dequeue(uint maxSize = 0)
+		uint dequeue(char * dest, uint maxSize)
 		{
 			uint	dataSize	=	(maxSize == 0 ? size() : MIN(maxSize, size()));
-			TsDataQueue_ByteArray	ret(dataSize, (char)0);
+// 			TsDataQueue_ByteArray	ret(dataSize, (char)0);
 			
-#ifdef UNIT_TEST
+			#ifdef UNIT_TEST
 			if(m_useGlobalLock)
 				m_locker.lock();
 			else
-#endif
+			#endif
 			m_dequeueLocker.lock();
-			
+		
 			// Delete empty items which are not at end
 			while(m_head->isEmpty() && m_head->next)
 			{
@@ -318,7 +317,7 @@ class TsDataQueue
 			{
 				uint	tmp	=	MIN(m_head->m_data->size() - m_head->m_pos, dataSize - read);
 				
-				memcpy(ret.data() + read, m_head->m_data->constData() + m_head->m_pos, tmp);
+				memcpy(dest + read, m_head->m_data->constData() + m_head->m_pos, tmp);
 				m_head->m_pos	+=	tmp;
 				read	+=	tmp;
 				
@@ -330,14 +329,27 @@ class TsDataQueue
 				}
 			}
 			
-			ret.resize(read);
-			
-#ifdef UNIT_TEST
+			#ifdef UNIT_TEST
 			if(m_useGlobalLock)
 				m_locker.unlock();
 			else
-#endif
+			#endif
 			m_dequeueLocker.unlock();
+			
+			return read;
+		}
+		
+		
+		TsDataQueue_ByteArray dequeue(uint maxSize = 0)
+		{
+			uint	dataSize	=	(maxSize == 0 ? size() : MIN(maxSize, size()));
+			
+			TsDataQueue_ByteArray	ret(dataSize, (char)0);
+			
+			uint	len	=	dequeue(ret.data(), ret.size());
+			
+			if(len < ret.size())
+				ret.resize(len);
 			
 			return ret;
 		}
