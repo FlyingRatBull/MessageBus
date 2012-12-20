@@ -89,8 +89,9 @@ class TsDataQueue
 	public:
 		TsDataQueue()
 		{
-			m_head	=	new TsDataQueueItem();
-			m_tail	=	m_head;
+			m_head			=	new TsDataQueueItem();
+			m_tail			=	m_head;
+			m_partSize	=	0;
 			
 #ifdef UNIT_TEST
 			m_useGlobalLock	=	false;
@@ -116,6 +117,7 @@ class TsDataQueue
 		
 		virtual TsDataQueue &operator=(const TsDataQueue &other)
 		{
+			m_partSize					=	other.m_partSize;
 			TsDataQueueItem	*	i	=	other.m_head;
 			
 			do
@@ -127,6 +129,8 @@ class TsDataQueue
 				else
 					m_head	=	m_tail	=	own;
 			}while(i->next && (i = i->next));
+			
+			return *this;
 		}
 		
 #ifdef UNIT_TEST
@@ -135,6 +139,11 @@ class TsDataQueue
 			m_useGlobalLock	=	use;
 		}
 #endif
+
+		void setPartSize(quint32 size)
+		{
+			m_partSize	=	size;
+		}
 		
 		bool isEmpty() const
 		{
@@ -201,10 +210,39 @@ class TsDataQueue
 #endif
 			m_enqueueLocker.lock();
 			
-			TsDataQueueItem	*	i	=	new TsDataQueueItem(data, size);
-			
-			m_tail->next	=	i;
-			m_tail				=	i;
+			// Respect part size if needed
+			if(m_partSize > 0)
+			{
+				i					=	m_tail;
+				int	pos		=	0;
+				int	iSize	=	i->m_data->size();
+				
+				while(pos < size)
+				{
+					if(iSize < m_partSize)
+					{
+						i->m_data->append(data + pos, m_partSize - iSize);
+						pos	+=	(m_partSize - iSize);
+						iSize	=	m_partSize;
+					}
+					else
+					{
+						TsDataQueueItem	*	i			=	new TsDataQueueItem(data + pos, MIN(size - pos, m_partSize));
+						iSize	=		p->m_data->size();
+						pos		+=	iSize;
+						
+						m_tail->next	=	i;
+						m_tail				=	i;
+					}
+				}
+			}
+			// Ignore part size
+			else
+			{
+				TsDataQueueItem	*	i	=	new TsDataQueueItem(data, size);
+				m_tail->next	=	i;
+				m_tail				=	i;
+			}
 			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -355,9 +393,12 @@ class TsDataQueue
 		mutable TsDataQueue_Mutex			m_enqueueLocker;
 		mutable TsDataQueue_Mutex			m_dequeueLocker;
 		
+		// Size of each part
+		quint32												m_partSize;
+		
 #ifdef UNIT_TEST
 		mutable TsDataQueue_Mutex			m_locker;
-		bool							m_useGlobalLock;
+		bool													m_useGlobalLock;
 #endif
 		
 		TsDataQueueItem	*	m_head;
