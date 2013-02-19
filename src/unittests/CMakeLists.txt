@@ -21,7 +21,7 @@ QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
 target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
-add_test(NAME ${APPNAME} COMMAND ${APPNAME})
+add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 
 add_subdirectory(localsocket)
