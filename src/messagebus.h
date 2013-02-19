@@ -21,6 +21,7 @@
 
 #include <QtCore>
 
+#include "global.h"
 #include "variant.h"
 
 class MessageBusPrivate;
@@ -71,7 +72,7 @@ class MessageBus : public QObject
 		void onDisconnected();
 		
 	private:
-		MessageBus(QObject * target, LocalSocket * socket, QObject * parent);
+		MSGBUS_LOCAL	MessageBus(QObject * target, LocalSocket * socket, QObject * parent);
 
 	private:
 		MessageBusPrivate			*	d;

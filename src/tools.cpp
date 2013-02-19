@@ -24,26 +24,40 @@
 #include <QMetaMethod>
 #include <QStringList>
 
+#include <malloc.h>
 
-const char * HTTP_NUMBERS	=	"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const QString HTTP_NUMBERS_QS ( HTTP_NUMBERS );
+#include "global.h"
+
+
+MSGBUS_LOCAL	const char *	HTTP_NUMBERS	=	"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const QString	HTTP_NUMBERS_QS ( HTTP_NUMBERS );
 
 
 bool callSlot ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5, Qt::ConnectionType type )
 {
-	char * method = (char*)slot;
+	const	int	slotLength	=	strlen(slot);
+	char		*	method			= (char*)malloc(slotLength + 1);
+	int				length			=	0;
 	
-	while(method[0] >= '0' && method[0] <= '9')
+	while(slot[length] >= '0' && slot[length] <= '9')
+		length++;
+	
+	// Copy from real slot name begin until end (incl. EOF)
+	memcpy(method, slot + length, slotLength - length + 1);
+	length	=	0;
+	
+	// Only numbers: No valid slot name
+	if(method[0] == '\0')
 	{
-		// Only numbers: No valid slot name
-		if(method[0] == '\0')
-			return false;
-		
-		method++;
+		free(method);
+		return false;
 	}
 	
-	QByteArray	data(QString::fromAscii(method).section("(", 0, 0).trimmed().toAscii());
-	method	=	data.data();
+	while(method[length] != '\0' && method[length] != '(' && method[length] != ' ')
+		length++;
+	
+	// We got the end of the slot name => put EOF
+	method[length]	=	'\0';
 
 	if ( !QMetaObject::invokeMethod ( object, method, type, arg1, arg2, arg3, arg4, arg5 ) )
 	{
@@ -76,9 +90,11 @@ bool callSlot ( QObject * object, const char * slot, QGenericArgument arg1, QGen
 
 		qWarning ( "Error invoking slot \"%s\": %s", method, qPrintable ( list.join ( ", " ) ) );
 
+		free(method);
 		return false;
 	}
 
+	free(method);
 	return true;
 }
 
@@ -109,8 +125,6 @@ bool callSlotBlockingQueued ( QObject * object, const char * slot, QGenericArgum
 
 QString uInt64ToBase64 ( const quint64 number )
 {
-	qDebug ( "HiTools::uInt64ToBase64( number = %llu ) => \"%s\"", number, qPrintable ( QString::fromAscii ( QByteArray ( ( const char* ) &number, sizeof ( quint64 ) ).toBase64() ) ) );
-	
 	return QString::fromAscii ( QByteArray ( ( char* ) &number, sizeof ( quint64 ) ).toBase64() );
 }
 

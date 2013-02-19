@@ -25,7 +25,7 @@
 #include "localsocket.h"
 
 LocalServer::LocalServer(QObject * parent)
-		:	QLocalServer(parent)
+	:	QLocalServer(parent)
 {
 }
 
@@ -53,9 +53,9 @@ bool LocalServer::listen(const QString& identifier)
 	
 	if(ret)
 	{
-		QFile::setPermissions(filename, QFile::ExeOwner | QFile::ExeGroup | QFile::ExeOther |
-																	QFile::ReadOwner | QFile::ReadGroup | QFile::ReadOther |
-																	QFile::WriteOwner | QFile::WriteGroup | QFile::WriteOther);
+		QFile::setPermissions(filename, QFile::ExeOwner | QFile::ExeGroup | /*QFile::ExeOther |*/
+																	QFile::ReadOwner | QFile::ReadGroup | /*QFile::ReadOther |*/
+																	QFile::WriteOwner | QFile::WriteGroup/* | QFile::WriteOther*/);
 		
 		m_id				=	identifier;
 		m_filename	=	filename;

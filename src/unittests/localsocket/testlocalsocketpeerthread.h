@@ -16,36 +16,52 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LOCALSERVER_H
-#define LOCALSERVER_H
 
-#include <QLocalServer>
+#ifndef TESTLOCALSOCKETPEERTHREAD_H
+#define TESTLOCALSOCKETPEERTHREAD_H
 
-#include "global.h"
+#include <QThread>
 
-class LocalSocket;
-class LocalServerPrivate;
+#include <QLocalSocket>
+#include <QReadWriteLock>
+#include <QWaitCondition>
 
-class LocalServer : public QLocalServer
+#include "../../localserver.h"
+
+
+class TestLocalSocket_Peer;
+
+class TestLocalSocketPeerThread : public QThread
 {
 	Q_OBJECT
-
+	
 	public:
-		LocalServer(QObject * parent = 0);
+		TestLocalSocketPeerThread(QObject * parent);
 		
-		virtual ~LocalServer();
+		virtual ~TestLocalSocketPeerThread();
+		
+		bool waitForStarted();
 
-		bool listen(const QString& identifier);
+		TestLocalSocket_Peer * peer() const;
+
+		LocalServer *localServer();
 		
-	signals:
-		void newConnection(quintptr socketDescriptor);
+		bool waitForFinished(int timeout = 0);
 		
 	protected:
-		virtual void	incomingConnection (quintptr socketDescriptor);
+		virtual void run();
 		
 	private:
-		QString			m_id;
-		QString			m_filename;
+		mutable QReadWriteLock			m_peerLock;
+		QWaitCondition						*	m_isPeerReady;
+		TestLocalSocket_Peer			*	m_peer;
+		
+		LocalServer								*	m_localServer;
+		
+		// Running state
+		bool												m_running;
+		QReadWriteLock							m_runningLock;
+		QWaitCondition							m_runningChanged;
 };
 
-#endif // LOCALSERVER_H
+#endif // TESTLOCALSOCKETPEERTHREAD_H

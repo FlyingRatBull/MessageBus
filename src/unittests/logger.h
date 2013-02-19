@@ -16,33 +16,31 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MSGBUS_P_H
-#define MSGBUS_P_H
 
-#include <QRegExp>
-#include <QString>
+#ifndef LOGGER_H
+#define LOGGER_H
 
-#include "localsocket.h"
+#include <QtCore>
 
-
-enum MSGBUS_LOCAL Command
+class Logger
 {
-	CallSlot			=	0x01,
-	CallSlotRet		=	0x02,
-	CallRetVal		=	0x03,			// Return value from CallSlotRet
-	CallRecv			=	0x04			// Call was received
+	public:
+		static void setLogFile(const QString& filename);
+		
+		static QString logFile();
+		
+		static void log(const QString& identifier, qreal value, const QString& annotation = QString(), const QString& annotationText = QString());
+		
+	private:
+		Logger();
+		
+	private:
+		static Logger				*	s_inst;
+		
+	private:
+		QReadWriteLock				m_logLock;
+		QFile								*	m_logFile;
+		QTextStream					*	m_logStream;
 };
 
-
-class Variant;
-class QLocalSocket;
-
-
-QString MSGBUS_LOCAL	socketName(const QString& service, const QString& object);
-
-QByteArray MSGBUS_LOCAL	writeVariant(const Variant& var);
-
-Variant MSGBUS_LOCAL	readVariant(const QByteArray& data, quint32& pos);
-
-
-#endif // MSGBUS_P_H
+#endif // LOGGER_H

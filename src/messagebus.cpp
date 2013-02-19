@@ -29,11 +29,11 @@
 
 #include "tools.h"
 
-class MessageBusPrivate
+class MSGBUS_LOCAL MessageBusPrivate
 {
 	public:
 		MessageBusPrivate(const QString& service, const QString& objectName, QObject * object, MessageBus * parent)
-		:	socket(new LocalSocket(socketName(service, objectName), parent)), p(parent), obj(object), m_dropNextSocketDescriptors(0)
+		:	socket(new LocalSocket(parent)), p(parent), obj(object), m_dropNextSocketDescriptors(0), sName(socketName(service, objectName))
 		{
 // 				dbg("socket: 0x%08X", (uint)socket)
 		}
@@ -48,7 +48,13 @@ class MessageBusPrivate
 		
 		bool open()
 		{
-			return socket->open(LocalSocket::ReadWrite);
+			if(sName.isEmpty())
+				return socket->open(LocalSocket::ReadWrite);
+			else
+			{
+				socket->connectToServer(sName, QIODevice::ReadWrite);
+				return socket->waitForConnected();
+			}
 		}
 
 
@@ -146,10 +152,10 @@ class MessageBusPrivate
 				m_returnValues[callId]	=	retVal;
 			}
 			
-// 			qDebug("[0x%08X] Writing call package ...", (int)this);
+// 			qDebug("[%p] Writing call package ...", this);
 			// Write call package
 			socket->writePackage(pkg);
-// 			qDebug("[0x%08X] ... done", (int)this);
+// 			qDebug("[%p] ... done", this);
 			
 			if(waitForRecv)
 			{
@@ -207,16 +213,11 @@ class MessageBusPrivate
 		}
 		
 		
-		void readData()
+		void readPackage(const QByteArray& package)
 		{
-// 			qDebug("MessageBus::readData()");
+// 			qDebug("MessageBus::runPackage()");
 			
-			if(QThread::currentThread() == p->thread())
-				qFatal("Called from same thread!");
-			
-			QByteArray	data(socket->readPackage());
-			
-			if(data.isEmpty())
+			if(package.isEmpty())
 				return;
 			
 			quint32		dataPos	=	0;
@@ -224,11 +225,11 @@ class MessageBusPrivate
 			int				callId	=	0;
 			
 			// Read command
-			memcpy(&cmd, data.constData() + dataPos, sizeof(cmd));
+			memcpy(&cmd, package.constData() + dataPos, sizeof(cmd));
 			dataPos	+=	sizeof(cmd);
 			
 			// Read call id
-			memcpy(&callId, data.constData() + dataPos, sizeof(callId));
+			memcpy(&callId, package.constData() + dataPos, sizeof(callId));
 			dataPos	+=	sizeof(callId);
 			
 			switch(cmd)
@@ -237,20 +238,20 @@ class MessageBusPrivate
 				case CallSlotRet:
 				{
 					quint32	strLength	=	0;
-					memcpy((char*)&strLength, data.constData() + dataPos, sizeof(strLength));
+					memcpy((char*)&strLength, package.constData() + dataPos, sizeof(strLength));
 					dataPos	+=	sizeof(strLength);
 					
-					QString	str(data.mid(dataPos, strLength));
+					QString	str(package.mid(dataPos, strLength));
 					dataPos	+=	strLength;
 					
-// 					qDebug("[thread: 0x%08X] MessageBus::readData(\"%s\", size: %d)", (int) QThread::currentThread(), qPrintable(str), data.size());
+					// 					qDebug("[thread: 0x%08X] MessageBus::readData(\"%s\", size: %d)", (int) QThread::currentThread(), qPrintable(str), data.size());
 					
 					quint32	numArgs	=	0;
-					memcpy((char*)&numArgs, data.constData() + dataPos, sizeof(numArgs));
+					memcpy((char*)&numArgs, package.constData() + dataPos, sizeof(numArgs));
 					dataPos	+=	sizeof(numArgs);
 					
-// 						qDebug("... before args, pos: %d", dataPos);
-
+					// 						qDebug("... before args, pos: %d", dataPos);
+					
 					str.prepend("0");
 					str.append("(");
 					QStringList	argList;
@@ -258,24 +259,24 @@ class MessageBusPrivate
 						argList.append("Variant");
 					str.append(argList.join(","));
 					str.append(")");
-
+					
 					QByteArray	dat(str.toAscii());
-
+					
 					const char * slot	=	dat.constData();
-
+					
 					QList<Variant>	args;
 					Variant					retVar;
 					
 					for(int i = 0; i < numArgs; i++)
 					{
-// 							quint32	tmp	=	dataPos;
-// 							Variant	varData	=	readVariant(data, dataPos);
+						// 							quint32	tmp	=	dataPos;
+						// 							Variant	varData	=	readVariant(data, dataPos);
 						
-// 							qDebug("... arg size: %d", (dataPos - tmp));
-// 							qDebug("... real arg size: %d", varData.toByteArray().size());
+						// 							qDebug("... arg size: %d", (dataPos - tmp));
+						// 							qDebug("... real arg size: %d", varData.toByteArray().size());
 						
-// 							args.append(varData);
-						args.append(readVariant(data, dataPos));
+						// 							args.append(varData);
+						args.append(readVariant(package, dataPos));
 						
 						// Check read socket descriptor
 						if(args.last().type() == Variant::SocketDescriptor)
@@ -295,15 +296,16 @@ class MessageBusPrivate
 						pkg.append(&c, 1);
 						pkg.append((const char*)(&callId), sizeof(callId));
 						
+						// Should work too if run from another thread
 						if(!socket->writePackage(pkg))
 							qWarning("MessageBus: Could not write received command!");
 					}
 					
-					if(dataPos < data.size())
+					if(dataPos < package.size())
 						qDebug("MessageBus: Still data to read!");
-
+					
 					bool ret	=	false;
-
+					
 					switch(args.count())
 					{
 						case 0:
@@ -313,7 +315,7 @@ class MessageBusPrivate
 							else
 								ret	=	callSlotDirect(obj, slot, Q_ARG(MessageBus*, p), Q_ARG(Variant*, &retVar));
 						}break;
-
+						
 						case 1:
 						{
 							if(cmd == CallSlot)
@@ -321,7 +323,7 @@ class MessageBusPrivate
 							else
 								ret	=	callSlotDirect(obj, slot, Q_ARG(MessageBus*, p), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)));
 						}break;
-
+						
 						case 2:
 						{
 							if(cmd == CallSlot)
@@ -329,7 +331,7 @@ class MessageBusPrivate
 							else
 								ret	=	callSlotDirect(obj, slot, Q_ARG(MessageBus*, p), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)));
 						}break;
-
+						
 						case 3:
 						{
 							if(cmd == CallSlot)
@@ -337,54 +339,54 @@ class MessageBusPrivate
 							else
 								ret	=	callSlotDirect(obj, slot, Q_ARG(MessageBus*, p), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)));
 						}break;
-
+						
 						case 4:
 						{
 							if(cmd == CallSlot)
 								ret	=	callSlotQueued(obj, slot, Q_ARG(MessageBus*, p), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)));
-// 									else
-// 										ret	=	callSlotDirect(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)));
+							// 									else
+								// 										ret	=	callSlotDirect(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)));
 						}break;
-
-// 								case 5:
-// 								{
-// 									if(cmd == CallSlot)
-// 										ret	=	callSlotAuto(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)), Q_ARG(Variant, args.at(4)));
-// 									else
-// 										ret	=	callSlotDirect(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)));
-// 								}break;
-
+						
+						// 								case 5:
+						// 								{
+							// 									if(cmd == CallSlot)
+						// 										ret	=	callSlotAuto(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)), Q_ARG(Variant, args.at(4)));
+						// 									else
+						// 										ret	=	callSlotDirect(object, slot, Q_ARG(LocalSocket*, socket), Q_ARG(Variant*, &retVar), Q_ARG(Variant, args.at(0)), Q_ARG(Variant, args.at(1)), Q_ARG(Variant, args.at(2)), Q_ARG(Variant, args.at(3)));
+						// 								}break;
+						
 						default:
 							break;
-					}
-
-					if(cmd == CallSlotRet)
-					{
-// 						qDebug("MessageBus: Returning value");
+						}
 						
-						// Write cmd
-						QByteArray	pkg;
-						quint32			tmp	=	0;
-
-						char	c	=	(char)CallRetVal;
-						pkg.append(&c, 1);
-						pkg.append((const char*)(&callId), sizeof(callId));
-						pkg.append(writeVariant(retVar));
-						
-						if(!socket->writePackage(pkg))
-							qWarning("MessageBus: Could not write return value!");
-						else if(retVar.type() == Variant::SocketDescriptor)
-							// Write socket descriptor
+						if(cmd == CallSlotRet)
+						{
+							// 						qDebug("MessageBus: Returning value");
+							
+							// Write cmd
+							QByteArray	pkg;
+							quint32			tmp	=	0;
+							
+							char	c	=	(char)CallRetVal;
+							pkg.append(&c, 1);
+							pkg.append((const char*)(&callId), sizeof(callId));
+							pkg.append(writeVariant(retVar));
+							
+							if(!socket->writePackage(pkg))
+								qWarning("MessageBus: Could not write return value!");
+							else if(retVar.type() == Variant::SocketDescriptor)
+								// Write socket descriptor
 							socket->writeSocketDescriptor(retVar.toSocketDescriptor());
-					}
-
-					if(!ret)
-						break;
-				}break;
-				
+						}
+						
+						if(!ret)
+							break;
+					}break;
+					
 				case CallRetVal:
 				{
-					Variant	ret	=	readVariant(data, dataPos);
+					Variant	ret	=	readVariant(package, dataPos);
 					
 					RetVal	*	retVal	=	0;
 					{
@@ -431,7 +433,7 @@ class MessageBusPrivate
 					retVal->val	=	ret;
 					retVal->isValAvailable.wakeAll();
 				}break;
-				
+					
 				case CallRecv:
 				{
 					RetVal	*	retVal	=	0;
@@ -484,6 +486,9 @@ class MessageBusPrivate
 		QObject							*	obj;
 		/// Socket for communication
 		LocalSocket					*	socket;
+		
+		/// Name of socket to connect to
+		QString								sName;
 		
 		/// Next call id
 		QAtomicInt						m_nextCallId;
@@ -666,7 +671,9 @@ void MessageBus::onNewPackage()
 	if(!d->isValid())
 		return;
 	
-	d->readData();
+// 	qDebug("MessageBus::onNewPackage()");
+	
+	QtConcurrent::run(d, &MessageBusPrivate::readPackage, d->socket->readPackage());
 }
 
 
@@ -675,7 +682,7 @@ void MessageBus::onNewSocketDescriptor()
 	if(!d->isValid())
 		return;
 	
-	d->readSocketDescriptor();
+	QtConcurrent::run(d, &MessageBusPrivate::readSocketDescriptor);
 }
 
 

@@ -184,7 +184,7 @@ class Variant
 		
 		quint64 toUInt64(bool * ok = 0) const;
 		
-		int toSocketDescriptor(bool * ok = 0) const;
+		quintptr toSocketDescriptor(bool * ok = 0) const;
 		
 		QByteArray toByteArray(bool * ok = 0) const;
 		
@@ -211,7 +211,7 @@ class Variant
 		
 		static Variant fromInt64(qint64 num);
 		
-		static Variant fromSocketDescriptor(int socketDescriptor);
+		static Variant fromSocketDescriptor(quintptr socketDescriptor);
 		
 		static Variant fromByteArray(const QByteArray& data);
 		

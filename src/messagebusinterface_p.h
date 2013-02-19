@@ -27,6 +27,7 @@
 // #include <sys/socket.h>
 // #include <sys/un.h>
 
+#include "global.h"
 #include "variant.h"
 #include "messagebusinterface.h"
 #include "messagebus.h"
@@ -34,7 +35,7 @@
 #include "tools.h"
 
 
-class MessageBusInterfacePrivate : public LocalServer
+class MSGBUS_LOCAL	MessageBusInterfacePrivate : public LocalServer
 {
 	Q_OBJECT
 
@@ -83,7 +84,9 @@ class MessageBusInterfacePrivate : public LocalServer
 		virtual void incomingConnection(quintptr socketDescriptor)
 		{
 // 				dbg("MsgBusInterfacePrivate::incomingConnection()");
-			LocalSocket	*	socket	=	new LocalSocket(socketDescriptor, this);
+			LocalSocket	*	socket	=	new LocalSocket(this);
+			
+			socket->setSocketDescriptor(socketDescriptor);
 
 			MessageBus	*	bus	=	new MessageBus(object, socket, this);
 			m_clients.append(bus);

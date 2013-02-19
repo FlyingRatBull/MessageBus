@@ -21,15 +21,25 @@
 
 #include <string.h>
 
+#include "global.h"
+
+
 #if QT_VERSION >= 0x040000
 	#include <QMutex>
-	#define TsDataQueue_Mutex				QMutex
-	#define TsDataQueue_ByteArray		QByteArray
+	#include <QAtomicInt>
+	#include <QWaitCondition>
+	
+	#define TsDataQueue_Mutex						QMutex
+	#define TsDataQueue_ByteArray				QByteArray
+	#define TsDataQueue_AtomicInt				QAtomicInt
+	#define TsDataQuzeue_WaitCondition	QWaitCondition
 	
 	#define	MIN(a,b) qMin(a,b)
 #else
 	#error No mutex class found!
 	#error No byte array class found!
+	#error No atomic int class found!
+	#error No wait condition class found!
 #endif
 
 
@@ -117,6 +127,12 @@ class TsDataQueue
 		
 		virtual TsDataQueue &operator=(const TsDataQueue &other)
 		{
+			m_enqueueLocker.lock();
+			other.m_enqueueLocker.lock();
+			m_dequeueLocker.lock();
+			other.m_dequeueLocker.lock();
+			
+			m_size							=	other.m_size;
 			m_partSize					=	other.m_partSize;
 			TsDataQueueItem	*	i	=	other.m_head;
 			
@@ -130,6 +146,16 @@ class TsDataQueue
 					m_head	=	m_tail	=	own;
 			}while(i->next && (i = i->next));
 			
+			if(m_size > 0)
+				m_nonEmpty.wakeAll();
+			else
+				m_empty.wakeAll();
+			
+			m_enqueueLocker.unlock();
+			other.m_enqueueLocker.unlock();
+			m_dequeueLocker.unlock();
+			other.m_dequeueLocker.unlock();
+			
 			return *this;
 		}
 		
@@ -140,7 +166,7 @@ class TsDataQueue
 		}
 #endif
 
-		void setPartSize(quint32 size)
+		void setPartSize(uint size)
 		{
 			m_partSize	=	size;
 		}
@@ -152,39 +178,41 @@ class TsDataQueue
 		
 		uint size() const
 		{
-			uint	ret	=	0;
-			
-			// Lock dequeueing to prevent lower actual count of items
-#ifdef UNIT_TEST
-			if(m_useGlobalLock)
-				m_locker.lock();
-			else
-#endif
-			m_dequeueLocker.lock();
-			
-			TsDataQueueItem	*	i	=	m_head;
-			
-			// Find start
-			while(i->isEmpty() && i->next)
-				i	=	i->next;
-			
-			// Count
-			if(!i->isEmpty())
-			{
-				do
-				{
-					ret	+=	i->m_data->size() - i->m_pos;
-				}while(i->next && (i = i->next));
-			}
-			
-#ifdef UNIT_TEST
-			if(m_useGlobalLock)
-				m_locker.unlock();
-			else
-#endif
-			m_dequeueLocker.unlock();
-			
-			return ret;
+			return (uint)m_size;
+		
+// 			uint	ret	=	0;
+// 			
+// 			// Lock dequeueing to prevent lower actual count of items
+// #ifdef UNIT_TEST
+// 			if(m_useGlobalLock)
+// 				m_locker.lock();
+// 			else
+// #endif
+// 			m_dequeueLocker.lock();
+// 			
+// 			TsDataQueueItem	*	i	=	m_head;
+// 			
+// 			// Find start
+// 			while(i->isEmpty() && i->next)
+// 				i	=	i->next;
+// 			
+// 			// Count
+// 			if(!i->isEmpty())
+// 			{
+// 				do
+// 				{
+// 					ret	+=	i->m_data->size() - i->m_pos;
+// 				}while(i->next && (i = i->next));
+// 			}
+// 			
+// #ifdef UNIT_TEST
+// 			if(m_useGlobalLock)
+// 				m_locker.unlock();
+// 			else
+// #endif
+// 			m_dequeueLocker.unlock();
+// 			
+// 			return ret;
 		}
 
 		
@@ -203,6 +231,9 @@ class TsDataQueue
 		
 		void enqueue(const char * data, int size)
 		{
+			if(size <= 0)
+				return;
+			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
 				m_locker.lock();
@@ -211,37 +242,43 @@ class TsDataQueue
 			m_enqueueLocker.lock();
 			
 			// Respect part size if needed
-			if(m_partSize > 0)
-			{
-				int	pos		=	0;
-				int	iSize	=	m_tail->m_data->size();
-				
-				while(pos < size)
-				{
-					if(iSize < m_partSize)
-					{
-						m_tail->m_data->append(data + pos, m_partSize - iSize);
-						pos	+=	(m_partSize - iSize);
-						iSize	=	m_partSize;
-					}
-					else
-					{
-						TsDataQueueItem	*	i			=	new TsDataQueueItem(data + pos, MIN((quint32)size - pos, m_partSize));
-						iSize	=		i->m_data->size();
-						pos		+=	iSize;
-						
-						m_tail->next	=	i;
-						m_tail				=	i;
-					}
-				}
-			}
-			// Ignore part size
-			else
+// 			if(m_partSize > 0)
+// 			{
+// 				int	pos		=	0;
+// 				int	iSize	=	(m_tail->m_data ? m_tail->m_data->size() : 0);
+// 				
+// 				while(pos < size)
+// 				{
+// 					if(!m_tail->isEmpty() && iSize < m_partSize)
+// 					{
+// 						m_tail->m_data->append(data + pos, MIN(m_partSize - iSize - pos, quint32(size - pos)));
+// 						pos	+=	(m_tail->m_data->size() - iSize);
+// 						m_size.fetchAndAddOrdered(m_tail->m_data->size() - iSize);
+// 						iSize	=	m_partSize;
+// 					}
+// 					else
+// 					{
+// 						TsDataQueueItem	*	i			=	new TsDataQueueItem(data + pos, MIN(quint32(size - pos), m_partSize));
+// 						iSize	=		i->m_data->size();
+// 						pos		+=	iSize;
+// 						m_size.fetchAndAddOrdered(iSize);
+// 						
+// 						m_tail->next	=	i;
+// 						m_tail				=	i;
+// 					}
+// 				}
+// 			}
+// 			// Ignore part size
+// 			else
 			{
 				TsDataQueueItem	*	i	=	new TsDataQueueItem(data, size);
 				m_tail->next	=	i;
 				m_tail				=	i;
+				m_size.fetchAndAddOrdered(size);
 			}
+			
+			// We are not empty anymore
+			m_nonEmpty.wakeAll();
 			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -254,8 +291,11 @@ class TsDataQueue
 		
 		TsDataQueue_ByteArray peek(uint maxSize = 0) const
 		{
-			uint	dataSize	=	(maxSize == 0 ? size() : MIN(maxSize, size()));
-			TsDataQueue_ByteArray	ret(dataSize, (char)0);
+			uint	dataSize	=	(maxSize == 0 ? UINT_MAX : maxSize);
+			TsDataQueue_ByteArray	ret;
+			
+			if(dataSize <= 8192)
+				ret.reserve(dataSize);
 			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -274,12 +314,14 @@ class TsDataQueue
 			{
 				uint	tmp	=	MIN(i->m_data->size() - i->m_pos, dataSize - read);
 				
+				ret.resize(ret.size() + tmp);
+				
 				memcpy(ret.data() + read, i->m_data->constData() + i->m_pos, tmp);
 				read	+=	tmp;
 				i	=	i->next;
 			}
 			
-			ret.resize(read);
+// 			ret.resize(read);
 			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -294,8 +336,7 @@ class TsDataQueue
 		
 		uint dequeue(char * dest, uint maxSize)
 		{
-			uint	dataSize	=	(maxSize == 0 ? size() : MIN(maxSize, size()));
-// 			TsDataQueue_ByteArray	ret(dataSize, (char)0);
+			uint	dataSize	=	(maxSize == 0 ? UINT_MAX : maxSize);
 			
 			#ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -320,7 +361,9 @@ class TsDataQueue
 				memcpy(dest + read, m_head->m_data->constData() + m_head->m_pos, tmp);
 				m_head->m_pos	+=	tmp;
 				read	+=	tmp;
+				m_size.fetchAndAddOrdered(-tmp);
 				
+				// Remove empty head
 				if(m_head->isEmpty() && m_head->next)
 				{
 					TsDataQueueItem	*	next	=	m_head->next;
@@ -328,6 +371,9 @@ class TsDataQueue
 					m_head	=	next;
 				}
 			}
+			
+			if(m_size < 1)
+				m_empty.wakeAll();
 			
 			#ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -344,7 +390,8 @@ class TsDataQueue
 		{
 			uint	dataSize	=	(maxSize == 0 ? size() : MIN(maxSize, size()));
 			
-			TsDataQueue_ByteArray	ret(dataSize, (char)0);
+			TsDataQueue_ByteArray	ret;
+			ret.resize(dataSize);
 			
 			uint	len	=	dequeue(ret.data(), ret.size());
 			
@@ -381,7 +428,9 @@ class TsDataQueue
 				
 				m_head->m_pos	+=	tmp;
 				read	+=	tmp;
+				m_size.fetchAndAddOrdered(-tmp);
 				
+				// Remove empty head
 				if(m_head->isEmpty() && m_head->next)
 				{
 					TsDataQueueItem	*	next	=	m_head->next;
@@ -389,6 +438,9 @@ class TsDataQueue
 					m_head	=	next;
 				}
 			}
+			
+			if(m_size < 1)
+				m_empty.wakeAll();
 			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
@@ -401,12 +453,83 @@ class TsDataQueue
 		}
 		
 		
+		bool waitForNonEmpty(uint timeout)
+		{
+			m_enqueueLocker.lock();
+			
+			if(m_size > 0)
+			{
+				m_enqueueLocker.unlock();
+				return true;
+			}
+			
+			m_nonEmpty.wait(&m_enqueueLocker, timeout);
+			m_enqueueLocker.unlock();
+			
+			return (m_size > 0);
+		}
+		
+		
+		void abortWaitForNonEmpty()
+		{
+			m_enqueueLocker.lock();
+			
+			m_nonEmpty.wakeAll();
+			
+			m_enqueueLocker.unlock();
+		}
+		
+		
+		bool waitForEmpty(uint timeout)
+		{
+			m_dequeueLocker.lock();
+			
+			if(m_size == 0)
+			{
+				m_dequeueLocker.unlock();
+				return true;
+			}
+			
+			m_empty.wait(&m_dequeueLocker, timeout);
+			m_dequeueLocker.unlock();
+			
+			return (m_size < 1);
+		}
+		
+		
+		bool contains(char c) const
+		{
+			m_dequeueLocker.lock();
+			TsDataQueueItem	*	i	=	m_head;
+			
+			while(i)
+			{
+				if(!i->isEmpty() && i->m_data->contains(c))
+				{
+					m_dequeueLocker.unlock();
+					return true;
+				}
+				
+				i	=	i->next;
+			}
+			
+			m_dequeueLocker.unlock();
+			
+			return false;
+		}
+		
+		
 	private:
 		mutable TsDataQueue_Mutex			m_enqueueLocker;
 		mutable TsDataQueue_Mutex			m_dequeueLocker;
+		TsDataQuzeue_WaitCondition		m_nonEmpty;
+		TsDataQuzeue_WaitCondition		m_empty;
 		
 		// Size of each part
-		quint32												m_partSize;
+		uint													m_partSize;
+		
+		// Total size
+		TsDataQueue_AtomicInt					m_size;
 		
 #ifdef UNIT_TEST
 		mutable TsDataQueue_Mutex			m_locker;

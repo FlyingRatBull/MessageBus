@@ -585,7 +585,7 @@ qint64 Variant::toInt64(bool * ok) const
 }
 
 
-int Variant::toSocketDescriptor(bool * ok) const
+quintptr Variant::toSocketDescriptor(bool *ok) const
 {
 	if(ok)
 		(*ok)	=	false;
@@ -594,10 +594,10 @@ int Variant::toSocketDescriptor(bool * ok) const
 	{
 		qint64	ret	=	getIntNumber(sizeof(qint64), ok);
 		
-		return (int)ret;
+		return (quintptr)ret;
 	}
 	
-	return -1;
+	return 0;
 }
 
 
@@ -773,7 +773,7 @@ Variant Variant::fromInt64(qint64 num)
 }
 
 
-Variant Variant::fromSocketDescriptor(int socketDescriptor)
+Variant Variant::fromSocketDescriptor(quintptr socketDescriptor)
 {
 	Variant	ret(SocketDescriptor);
 	ret.setValue((qint64)socketDescriptor);

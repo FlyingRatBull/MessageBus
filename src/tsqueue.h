@@ -19,9 +19,13 @@
 #ifndef TSQUEUE_H
 #define TSQUEUE_H
 
+#include "global.h"
+
 #if QT_VERSION >= 0x040000
+	#include <qglobal.h>
 	#include <QMutex>
 	#define TsQueue_Mutex		QMutex
+	#define	ASSERT					Q_ASSERT
 #else
 	#error No mutex class found!
 #endif
@@ -114,6 +118,8 @@ class TsQueue
 				else
 					m_head	=	m_tail	=	own;
 			}while(i->next && (i = i->next));
+			
+			return *this;
 		}
 		
 #ifdef UNIT_TEST
@@ -167,10 +173,9 @@ class TsQueue
 		
 		const T& last() const
 		{
-			if(m_tail->isEmpty())
-				return T();
-			else
-				return *m_tail->m_data;
+			ASSERT(!m_tail->isEmpty());
+
+			return *m_tail->m_data;
 		}
 		
 		void clear()
@@ -252,7 +257,7 @@ class TsQueue
 		
 #ifdef UNIT_TEST
 		mutable TsQueue_Mutex			m_locker;
-		bool							m_useGlobalLock;
+		bool											m_useGlobalLock;
 #endif
 		
 		TsQueueItem<T>	*	m_head;

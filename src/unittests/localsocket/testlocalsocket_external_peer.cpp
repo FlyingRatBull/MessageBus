@@ -16,30 +16,16 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QtCore>
+
 #include "testlocalsocket_external_peer_object.h"
 
-PeerObject::PeerObject()
-	:	QObject()
+
+int main(int argc, char ** argv)
 {
-	init();
-}
-
-
-PeerObject::~PeerObject()
-{
-}
-
-
-void PeerObject::close(MessageBus *bus)
-{
-	QCoreApplication::exit(0);
-}
-
-
-void PeerObject::init()
-{
-	m_messageBus	=	new MessageBus("MessageBusTest", "/i", this);
+	QCoreApplication	app(argc, argv);
 	
-	if(!m_messageBus->isOpen())
-		QCoreApplication::exit(1);
+	PeerObject	peer(app.arguments().at(1));
+	
+	return app.exec();
 }
