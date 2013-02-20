@@ -132,6 +132,14 @@ void LocalSocketPrivate_Unix::open(quintptr socketDescriptor, bool socketOpen, Q
 
 void LocalSocketPrivate_Unix::close()
 {
+	// Delete read notifier
+	if(m_readNotifier)
+	{
+		m_readNotifier->setEnabled(false);
+		delete m_readNotifier;
+		m_readNotifier	=	0;
+	}
+	
 	if(m_socket <= 0)
 		return;
 	
@@ -139,13 +147,6 @@ void LocalSocketPrivate_Unix::close()
 // 	*((int*)0)	=	0;
 	
 // 	qDebug("LocalSocketPrivate_Unix::close()");
-	
-	// Delete read notifier
-	if(m_readNotifier)
-	{
-		delete m_readNotifier;
-		m_readNotifier	=	0;
-	}
 	
 	if(::close(m_socket) != 0)
 	{
@@ -174,7 +175,7 @@ void LocalSocketPrivate_Unix::readData()
 	{
 		if(!readSocketDescriptor())
 		{
-			if(m_readNotifier)
+			if(m_readNotifier && isOpen())
 				m_readNotifier->setEnabled(true);
 			// Socket descriptor could not be read -> retry next time
 			return;
@@ -188,7 +189,7 @@ void LocalSocketPrivate_Unix::readData()
 		return;
 	
 // 	qDebug("readData() - still open");
-	if(m_readNotifier)
+	if(m_readNotifier && isOpen())
 		m_readNotifier->setEnabled(false);
 // 	qDebug("??? Reading data...");
 		
@@ -212,7 +213,7 @@ void LocalSocketPrivate_Unix::readData()
 		// Read would have blocked
 		if(errno == EAGAIN || errno == EWOULDBLOCK)
 		{
-			if(m_readNotifier)
+			if(m_readNotifier && isOpen())
 				m_readNotifier->setEnabled(true);
 			return;
 		}

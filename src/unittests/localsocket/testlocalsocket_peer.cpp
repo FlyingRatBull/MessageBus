@@ -53,6 +53,17 @@ TestLocalSocket_Peer::~TestLocalSocket_Peer()
 		m_socketChanged.wakeAll();
 	}
 	
+	if(m_peerSocket)
+	{
+		QWriteLocker		locker(&m_peerSocketLock);
+		
+		m_peerSocket->abort();
+		m_peerSocket->deleteLater();
+		m_peerSocket	=	0;
+		
+		m_peerSocketReady.wakeAll();
+	}
+	
 	{	
 		QWriteLocker	ctrlLocker(&m_peerSocketLock);
 		
@@ -163,6 +174,7 @@ bool TestLocalSocket_Peer::waitForTotalSuccessCount(quint64 numSuccess, int step
 		return true;
 	
 	QElapsedTimer	timer;
+	timer.start();
 	while(m_recSuccessCount < numSuccess)
 	{
 		QCoreApplication::processEvents();

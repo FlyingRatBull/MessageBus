@@ -102,11 +102,8 @@ void TestLocalSocket::cleanup()
 	// LocalSocket gets deleted by peer class
 	m_localSocket	=	0;
 	
-	if(m_controlSocket)
-	{
-		m_controlSocket->deleteLater();
-		m_controlSocket	=	0;
-	}
+	// QLocalSocket gets deleted by peer class
+	m_controlSocket	=	0;
 	
 	if(m_peerThread)
 	{
@@ -165,7 +162,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	const	int				logInterval	=	200;	// In msec
 	logTimer.start();
 	
-	qDebug("Running %d seconds", runTime);
+	printf("\tRunning %d seconds\n", runTime);
 	
 	time.start();
 	while(time.elapsed() < runTime * 1000)
@@ -231,8 +228,8 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					{
 						qint64	tmp	=	m_localSocket->write(dataAr.constData() + written, dataAr.size() - written);
 						
-						if(tmp < 0)
-							qDebug("tmp < 0! open: %s", m_localSocket->isOpen() ? "true" : "false");
+// 						if(tmp < 0)
+// 							qDebug("tmp < 0! open: %s", m_localSocket->isOpen() ? "true" : "false");
 						QVERIFY2(tmp >= 0, qPrintable(QString("Could not write all data to peer! (" + m_localSocket->errorString() + ")")));
 						
 						written	+=	tmp;
@@ -241,10 +238,10 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					
 					// For debugging
 					
-					// 				printf("=== Data written ===\n");
+					// 				printf("\t=== Data written ===\n");
 					// 				for(int i = 0; i < data.size(); i++)
-					// 					printf("%02X", data.constData()[i]);
-					// 				printf("\n====================\n");
+					// 					printf("\t%02X", data.constData()[i]);
+					// 				printf("\t\n====================\n");
 					
 					QVERIFY2(written == dataAr.size(), "Could not write all data to peer!");
 					
@@ -303,7 +300,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	
 	Logger::log("Written commands (TestLocalSocket)", sendCount, "wB", "Waiting for bytes to be written");
 	
-	qDebug("Sent %llu actions (%llu data portions, %llu packages, %llu file descriptors)!", sendCount, sendCountData, sendCountPackage, sendCountFD);
+	printf("\tSent %llu actions (%llu data portions, %llu packages, %llu file descriptors)\n", sendCount, sendCountData, sendCountPackage, sendCountFD);
 	
 	quint64			sendBytesFormatted	=	sendBytes;
 	QStringList	formatter;
@@ -314,9 +311,9 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 		sendBytesFormatted	/=	1024;
 		idx++;
 	}
-	qDebug("Sent %llu bytes (%llu %s)", sendBytes, sendBytesFormatted, qPrintable(formatter[idx]));
+	printf("\tSent %llu bytes (%llu %s)\n", sendBytes, sendBytesFormatted, qPrintable(formatter[idx]));
 	
-	qDebug("Waiting for results (This could take a while)");
+	printf("\tWaiting for results (This could take a while)\n");
 	
 	while(m_localSocket->isOpen() && m_localSocket->bytesToWrite())
 	{
