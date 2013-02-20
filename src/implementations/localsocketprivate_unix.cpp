@@ -114,9 +114,9 @@ void LocalSocketPrivate_Unix::open(quintptr socketDescriptor, bool socketOpen, Q
 	int	tmp	=	getsockopt(m_socket, SOL_SOCKET, SO_SNDBUF, &buff, &optlen);
 	
 	// We received the send buffer size -> set it
-// 	if(tmp > 0)
-// 		setWriteBufferSize(tmp);
-// 	
+	if(tmp > 0)
+		setWriteBufferSize(tmp);
+	
 	// Create read notifier if we can read
 	if(mode | QIODevice::ReadOnly)
 	{
@@ -142,9 +142,6 @@ void LocalSocketPrivate_Unix::close()
 	
 	if(m_socket <= 0)
 		return;
-	
-	// Crash
-// 	*((int*)0)	=	0;
 	
 // 	qDebug("LocalSocketPrivate_Unix::close()");
 	
