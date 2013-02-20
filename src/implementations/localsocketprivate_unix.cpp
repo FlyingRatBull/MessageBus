@@ -136,7 +136,7 @@ void LocalSocketPrivate_Unix::close()
 	if(m_readNotifier)
 	{
 		m_readNotifier->setEnabled(false);
-		delete m_readNotifier;
+		m_readNotifier->deleteLater();
 		m_readNotifier	=	0;
 	}
 	

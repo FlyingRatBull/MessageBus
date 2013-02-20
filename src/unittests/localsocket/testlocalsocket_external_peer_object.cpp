@@ -246,7 +246,8 @@ void PeerObject::readData()
 			if(m_socket->bytesAvailable() < 1) {
 				waiting	=	true;
 // 				Logger::log("Read bytes (TestLocalSocket_Ext_PO)", totalRead + read, "bW", "Begin waiting for bytes");
-				m_socket->waitForReadyRead(10000 - timer.elapsed());
+				if(m_socket->waitForReadyRead(10000 - timer.elapsed()))
+					timer.restart();
 			}
 
 			tmp	=	m_socket->read(data.data() + read, size - read);

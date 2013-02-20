@@ -165,7 +165,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	printf("\tRunning %d seconds\n", runTime);
 	
 	time.start();
-	while(time.elapsed() < runTime * 1000)
+	while(m_localSocket && time.elapsed() < runTime * 1000)
 	{
 		QVERIFY2(m_localSocket->isOpen(), qPrintable(QString("LocalSocket not open! (" + m_localSocket->errorString() + ")")));
 		
@@ -224,7 +224,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					QElapsedTimer	timer;
 					timer.start();
 					
-					while(written < dataAr.size() && timer.elapsed() < 30000)
+					while(m_localSocket && m_localSocket->isOpen() && written < dataAr.size() && timer.elapsed() < 30000)
 					{
 						qint64	tmp	=	m_localSocket->write(dataAr.constData() + written, dataAr.size() - written);
 						
@@ -315,7 +315,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	
 	printf("\tWaiting for results (This could take a while)\n");
 	
-	while(m_localSocket->isOpen() && m_localSocket->bytesToWrite())
+	while(m_localSocket && m_localSocket->isOpen() && m_localSocket->bytesToWrite())
 	{
 		QCoreApplication::processEvents();
 		m_localSocket->waitForBytesWritten(10000);
