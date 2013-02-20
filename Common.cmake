@@ -1,4 +1,6 @@
-ENABLE_TESTING()
+#	Enable testing (incl. CDash)
+enable_testing()
+include(Ctest)
 
 if(EXISTS "${PROJECT_SOURCE_DIR}/Definitions.cmake")
 	include("${PROJECT_SOURCE_DIR}/Definitions.cmake")
