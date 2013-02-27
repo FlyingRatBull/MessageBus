@@ -34,15 +34,19 @@ set(HEADERS
 	)
 
 set(INST_HEADERS
+	LocalServer
 	localserver.h
+	LocalSocket
 	localsocket.h
 
+	MessageBus
 	messagebus.h
 	messagebusinterface.h
 
 	tools.h
 	tsdataqueue.h
 	tsqueue.h
+	Variant
 	variant.h
 )
 
