@@ -91,4 +91,6 @@ install(TARGETS "${APPNAME}"
 install_headers(INST_HEADERS)
 
 # Add unit tests
-add_subdirectory(unittests)
+if(NOT NO_UNIT_TESTS)
+	add_subdirectory(unittests)
+endif()
