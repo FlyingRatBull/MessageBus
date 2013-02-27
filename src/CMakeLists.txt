@@ -33,6 +33,19 @@ set(HEADERS
 # 	variant.h
 	)
 
+set(INST_HEADERS
+	localserver.h
+	localsocket.h
+
+	messagebus.h
+	messagebusinterface.h
+
+	tools.h
+	tsdataqueue.h
+	tsqueue.h
+	variant.h
+)
+
 # OS specific implementations
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 	set(SOURCES ${SOURCES}
@@ -69,12 +82,13 @@ target_link_libraries("${APPNAME}" ${QT_QTCORE_LIBRARY}
 # 	${QT_QTNETWORK_LIBRARY}
 	)
 
-
 install(TARGETS "${APPNAME}"
 	RUNTIME DESTINATION ${EXECUTABLE_INSTALL_PATH}
 	LIBRARY DESTINATION ${LIBRARY_INSTALL_PATH}
 	RUNTIME DESTINATION ${EXECUTABLE_INSTALL_PATH}
 	)
+# Install headers
+install_headers(INST_HEADERS)
 
 # Add unit tests
 add_subdirectory(unittests)
