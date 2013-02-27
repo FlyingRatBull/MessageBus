@@ -43,6 +43,7 @@ set(INST_HEADERS
 	messagebus.h
 	messagebusinterface.h
 
+	global.h
 	tools.h
 	tsdataqueue.h
 	tsqueue.h
