@@ -22,6 +22,13 @@
 
 #include "unittests/logger.h"
 
+// How to emit signals underlying from threads
+#ifdef SIGNALS_FROM_THREADS
+	#define THREAD_SIGNAL_TYPE	Qt::DirectConnection
+#else
+	#define THREAD_SIGNAL_TYPE	Qt::AutoConnection
+#endif
+
 LocalSocket::LocalSocket(QObject * parent)
 	:	QIODevice(parent), d_ptr(new LocalSocketPrivate_Thread(this))
 {
@@ -30,12 +37,12 @@ LocalSocket::LocalSocket(QObject * parent)
 	connect(d_ptr, SIGNAL(stateChanged(LocalSocket::LocalSocketState)), SIGNAL(stateChanged(LocalSocket::LocalSocketState)));
 	connect(d_ptr, SIGNAL(error(LocalSocket::LocalSocketError)), SIGNAL(error(LocalSocket::LocalSocketError)));
 	
-	connect(d_ptr, SIGNAL(readyReadPackage()), SIGNAL(readyReadPackage()));
-	connect(d_ptr, SIGNAL(readyReadSocketDescriptor()), SIGNAL(readyReadSocketDescriptor()));
-	connect(d_ptr, SIGNAL(bytesWritten(qint64)), SIGNAL(bytesWritten(qint64)));
-	connect(d_ptr, SIGNAL(packageWritten()), SIGNAL(packageWritten()));
-	connect(d_ptr, SIGNAL(socketDescriptorWritten(quintptr)), SIGNAL(socketDescriptorWritten(quintptr)));
-	connect(d_ptr, SIGNAL(readyRead()), SIGNAL(readyRead()));
+	connect(d_ptr, SIGNAL(readyReadPackage()), SIGNAL(readyReadPackage()), THREAD_SIGNAL_TYPE);
+	connect(d_ptr, SIGNAL(readyReadSocketDescriptor()), SIGNAL(readyReadSocketDescriptor()), THREAD_SIGNAL_TYPE);
+	connect(d_ptr, SIGNAL(bytesWritten(qint64)), SIGNAL(bytesWritten(qint64)), THREAD_SIGNAL_TYPE);
+	connect(d_ptr, SIGNAL(packageWritten()), SIGNAL(packageWritten()), THREAD_SIGNAL_TYPE);
+	connect(d_ptr, SIGNAL(socketDescriptorWritten(quintptr)), SIGNAL(socketDescriptorWritten(quintptr)), THREAD_SIGNAL_TYPE);
+	connect(d_ptr, SIGNAL(readyRead()), SIGNAL(readyRead()), THREAD_SIGNAL_TYPE);
 }
 
 

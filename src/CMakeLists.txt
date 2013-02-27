@@ -80,6 +80,11 @@ qt4_add_resources(RES_SOURCES ${RESOURCES})
 # We are building the library
 add_definitions(-DMSGBUS_DLL)
 
+# Forward definitions
+if(SIGNALS_FROM_THREADS)
+	add_definitions(-DSIGNALS_FROM_THREADS)
+endif()
+
 # Create the actual executable
 add_library("${APPNAME}" SHARED ${SOURCES} ${MOC_SOURCES} ${FORM_SOURCES} ${RES_SOURCES})
 target_link_libraries("${APPNAME}" ${QT_QTCORE_LIBRARY}
