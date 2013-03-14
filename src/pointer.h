@@ -90,6 +90,11 @@ class Pointer
 			return m_value;
 		}
 		
+		void setAutoDelete(bool enabled = true)
+		{
+			m_autoDelete	=	enabled;
+		}
+		
 	private:
 		void registerValue(T * newValue)
 		{
