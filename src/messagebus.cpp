@@ -340,7 +340,21 @@ class MSGBUS_LOCAL MessageBusPrivate
 						if(args.last().type() == Variant::SocketDescriptor)
 						{
 							args.takeLast();
-							args.append(Variant::fromSocketDescriptor(socket->readSocketDescriptor()));
+							
+							QReadLocker	readLock(&m_pendingSocketDescriptorsLock);
+						
+							if(m_pendingSocketDescriptors.isEmpty())
+								m_pendingSocketDescriptorsNonEmpty.wait(&m_pendingSocketDescriptorsLock, 30000);
+							
+							if(m_pendingSocketDescriptors.isEmpty())
+							{
+								setError(MessageBus::WaitAnswerError, "Failed to wait for socket descriptor!");
+								m_dropNextSocketDescriptors++;
+								qDebug("MessageBus: Failed to wait for socket descriptor!");
+								return;
+							}
+							
+							args.append(Variant::fromSocketDescriptor(m_pendingSocketDescriptors.takeFirst()));
 						}
 					}
 					
