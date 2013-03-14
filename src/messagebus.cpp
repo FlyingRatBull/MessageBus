@@ -28,6 +28,7 @@
 #include "messagebus_p.h"
 
 #include "tools.h"
+#include "pointer.h"
 
 class MSGBUS_LOCAL MessageBusPrivate
 {
@@ -44,22 +45,61 @@ class MSGBUS_LOCAL MessageBusPrivate
 		{
 			socket->setParent(parent);
 		}
-		
-		
-		bool open()
-		{
-			if(sName.isEmpty())
-				return socket->open(LocalSocket::ReadWrite);
-			else
-			{
-				socket->connectToServer(sName, QIODevice::ReadWrite);
-				return socket->waitForConnected();
-			}
-		}
 
 
 		~MessageBusPrivate()
 		{
+			close();
+		}
+		
+		
+		bool open()
+		{
+			bool	ret;
+			
+			if(sName.isEmpty())
+				ret	=	socket->open(LocalSocket::ReadWrite);
+			else
+			{
+				socket->connectToServer(sName, QIODevice::ReadWrite);
+				ret	=	socket->waitForConnected();
+			}
+			
+			if(!ret)
+			{
+				setError(MessageBus::SocketError, "Could not open socket!");
+				qDebug("MessageBus: Could not open socket (%s)!", qPrintable(socket->errorString()));
+			}
+			
+			return ret;
+		}
+		
+		
+		void close()
+		{
+			// Wake up all waiting calls
+			{
+				QReadLocker	readLock(&(m_returnValuesLock));
+				foreach(quint64 id, m_returnValues.keys())
+					m_returnValues[id]->isValAvailable.wakeAll();
+			}
+			
+			// Remove all return values ( Will be deleted automatically)
+			{
+				QWriteLocker	writeLock(&(m_returnValuesLock));
+				m_returnValues.clear();
+			}
+			
+			if(isValid())
+				socket->close();
+		}
+		
+		
+		void setError(MessageBus::Error err, const QString& errorStr)
+		{
+			m_errorString	=	errorStr;
+			emit(p->error(err));
+			close();
 		}
 
 		
@@ -139,22 +179,35 @@ class MSGBUS_LOCAL MessageBusPrivate
 			// Write socket descriptors first
 // 			qDebug("[0x%08X] Writing socket descriptors ...", (int)this);
 			foreach(int socketDescriptor, socketDescriptors)
-				socket->writeSocketDescriptor(socketDescriptor);
+			{
+				if(!socket->writeSocketDescriptor(socketDescriptor))
+				{
+					setError(MessageBus::TransferSocketDescriptorError, "Could not write socket descriptor!");
+					qDebug("MessageBus: Could not write socket descriptor (%s)!", qPrintable(socket->errorString()));
+					return Variant();
+				}
+			}
 // 			qDebug("[0x%08X] ... done", (int)this);
 			
 			// Create return struct
-			RetVal	*	retVal	=	new RetVal;
+			///@bug RetVal doesn't get deleted; Create unit test for Pointer<>
+			Pointer<RetVal>	retVal(new RetVal);
 			{
 				retVal->callTransferred	=	false;
 				
 				// Safely insert return struct
-				QWriteLocker	readLock(&m_returnValuesLock);
+				QWriteLocker	writeLock(&m_returnValuesLock);
 				m_returnValues[callId]	=	retVal;
 			}
 			
 // 			qDebug("[%p] Writing call package ...", this);
 			// Write call package
-			socket->writePackage(pkg);
+			if(!socket->writePackage(pkg))
+			{
+				setError(MessageBus::TransferDataError, "Could not write package!");
+				qDebug("MessageBus: Could not write package (%s)!", qPrintable(socket->errorString()));
+				return Variant();
+			}
 // 			qDebug("[%p] ... done", this);
 			
 			if(waitForRecv)
@@ -168,11 +221,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 				
 				if(!retVal->callTransferred)
 				{
-					qWarning("MessageBus: Failed to wait for call to be transferred: %s", qPrintable(slot));
+					setError(MessageBus::WaitAnswerError, "Failed to wait for successful receival!");
+					qDebug("MessageBus: Failed to wait for call to be transferred: %s", qPrintable(slot));
 					return Variant();
 				}
-				
-				readLocker.unlock();
 			}
 
 			switch(cmd)
@@ -192,7 +244,11 @@ class MSGBUS_LOCAL MessageBusPrivate
 						retVal->isValAvailable.wait(&retVal->lock, (timeout > 0 ? timeout - elapsed.elapsed() : 30000));
 					
 					if(!retVal->val.isValid())
-						return Variant();
+					{
+						setError(MessageBus::WaitAnswerError, "Failed to wait for return value!");
+						qDebug("MessageBus: Failed to wait for return value!");
+						return	Variant();
+					}
 					
 					// Now we already have an return value
 					
@@ -201,11 +257,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 					
 					// Remove return value
 					{
-						QWriteLocker	readLock(&m_returnValuesLock);
+						QWriteLocker	writeLock(&m_returnValuesLock);
 						m_returnValues.remove(callId);
 					}
-					
-					delete retVal;
 					
 					return ret;
 				}break;
@@ -218,7 +272,11 @@ class MSGBUS_LOCAL MessageBusPrivate
 // 			qDebug("MessageBus::runPackage()");
 			
 			if(package.isEmpty())
+			{
+				setError(MessageBus::TransferDataError, "Empty package received!");
+				qDebug("MessageBus: Empty package received!");
 				return;
+			}
 			
 			quint32		dataPos	=	0;
 			char			cmd			=	0;
@@ -298,11 +356,20 @@ class MSGBUS_LOCAL MessageBusPrivate
 						
 						// Should work too if run from another thread
 						if(!socket->writePackage(pkg))
-							qWarning("MessageBus: Could not write received command!");
+						{
+							setError(MessageBus::TransferDataError, "Could not write successful receival package!");
+							qDebug("MessageBus: Could not write received command!");
+							return;
+						}
+							
 					}
 					
 					if(dataPos < package.size())
+					{
+						setError(MessageBus::TransferDataError, "Package too long!");
 						qDebug("MessageBus: Still data to read!");
+						return;
+					}
 					
 					bool ret	=	false;
 					
@@ -374,7 +441,11 @@ class MSGBUS_LOCAL MessageBusPrivate
 							pkg.append(writeVariant(retVar));
 							
 							if(!socket->writePackage(pkg))
-								qWarning("MessageBus: Could not write return value!");
+							{
+								setError(MessageBus::TransferDataError, "Could not write return value!");
+								qDebug("MessageBus: Could not write return value (%s)!", qPrintable(socket->errorString()));
+								return;
+							}
 							else if(retVar.type() == Variant::SocketDescriptor)
 								// Write socket descriptor
 							socket->writeSocketDescriptor(retVar.toSocketDescriptor());
@@ -388,18 +459,19 @@ class MSGBUS_LOCAL MessageBusPrivate
 				{
 					Variant	ret	=	readVariant(package, dataPos);
 					
-					RetVal	*	retVal	=	0;
-					{
-						QReadLocker	readLock(&m_returnValuesLock);
-						retVal	=	m_returnValues[callId];
-					}
+					// Read locker must be locked as long as we use retVal as retVal could be deleted otherwise
+					QReadLocker	readLock(&m_returnValuesLock);
 					
 					// We don't have an registered ret value for this call id
-					if(retVal == 0)
+					if(!m_returnValues.contains(callId))
 					{
-						qWarning("Return value with invalid call id received!");
-						break;
+						setError(MessageBus::TransferDataError, "Invalid package received!");
+						qDebug("MessageBus: Return value with invalid call id received!");
+						return;
 					}
+					
+					Pointer<RetVal>	retVal(m_returnValues[callId]);
+					readLock.unlock();
 					
 					QWriteLocker	writeLock(&retVal->lock);
 					
@@ -422,9 +494,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 						
 						if(m_pendingSocketDescriptors.isEmpty())
 						{
+							setError(MessageBus::WaitAnswerError, "Failed to wait for socket descriptor!");
 							m_dropNextSocketDescriptors++;
-							qWarning("No socket descriptor recevied for return value of type SocketDescriptor!");
-							break;
+							qDebug("MessageBus: Failed to wait for socket descriptor!");
+							return;
 						}
 						
 						ret.setValue(m_pendingSocketDescriptors.takeFirst());
@@ -436,18 +509,19 @@ class MSGBUS_LOCAL MessageBusPrivate
 					
 				case CallRecv:
 				{
-					RetVal	*	retVal	=	0;
-					{
-						QReadLocker	readLock(&m_returnValuesLock);
-						retVal	=	m_returnValues[callId];
-					}
+					// Read locker must be locked as long as we use retVal as retVal could be deleted otherwise
+					QReadLocker	readLock(&m_returnValuesLock);
 					
 					// We don't have an registered ret value for this call id
-					if(retVal == 0)
+					if(!m_returnValues.contains(callId))
 					{
-						qWarning("Return value with invalid call id received!");
-						break;
+						setError(MessageBus::TransferDataError, "Invalid package received!");
+						qDebug("MessageBus: Return value with invalid call id received!");
+						return;
 					}
+					
+					Pointer<RetVal>	retVal(m_returnValues[callId]);
+					readLock.unlock();
 					
 					QWriteLocker	writeLock(&retVal->lock);
 					
@@ -462,6 +536,15 @@ class MSGBUS_LOCAL MessageBusPrivate
 		{
 			QWriteLocker	writeLock(&m_pendingSocketDescriptorsLock);
 			int	socketDescriptor	=	socket->readSocketDescriptor();
+			
+			Q_ASSERT(socketDescriptor > 0);
+			
+			if(socketDescriptor < 1)
+			{
+				setError(MessageBus::TransferSocketDescriptorError, "Invalid socket descriptor received!");
+				qDebug("MessageBus: Invalid socket descriptor received (%s)!", qPrintable(socket->errorString()));
+				return;
+			}
 			
 			if(m_dropNextSocketDescriptors)
 				// Drop socket descriptor as it was requested earlier and we received it to late
@@ -486,6 +569,8 @@ class MSGBUS_LOCAL MessageBusPrivate
 		QObject							*	obj;
 		/// Socket for communication
 		LocalSocket					*	socket;
+		/// Last error string
+		QString								m_errorString;
 		
 		/// Name of socket to connect to
 		QString								sName;
@@ -512,7 +597,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 		};
 		
 		/// Return values by call id
-		QHash<int, RetVal*>		m_returnValues;
+		QHash<int, Pointer<RetVal>	>		m_returnValues;
 		/// Mutex for m_returnValues
 		QMutex								m_returnValuesMutex;
 		/// Read/Write Lock for m_returnValuesMutex
@@ -708,23 +793,7 @@ bool MessageBus::open()
 void MessageBus::close()
 {
 // 	qDebug("MessageBus::close()");
-	// Wake up all waiting calls
-	{
-		QReadLocker	readLock(&(d->m_returnValuesLock));
-		foreach(quint64 id, d->m_returnValues.keys())
-			d->m_returnValues[id]->isValAvailable.wakeAll();
-	}
-	
-	// Remove all return values
-	{
-		QWriteLocker	writeLock(&(d->m_returnValuesLock));
-		foreach(quint64 id, d->m_returnValues.keys())
-			delete d->m_returnValues[id];
-		d->m_returnValues.clear();
-	}
-	
-	if(d->isValid())
-		d->socket->close();
+	d->close();
 }
 
 
@@ -737,6 +806,12 @@ bool MessageBus::isOpen() const
 void MessageBus::setReceiver(QObject *obj)
 {
 	d->obj	=	obj;
+}
+
+
+QString MessageBus::errorString() const
+{
+	return d->m_errorString;
 }
 
 

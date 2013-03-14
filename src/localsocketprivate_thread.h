@@ -71,7 +71,7 @@ class MSGBUS_LOCAL LocalSocketPrivate_Thread : public QThread
 				lsPrivateLock.lockForWrite();
 				if(lsPrivate)
 				{
-					delete lsPrivate;
+					lsPrivate->deleteLater();
 					lsPrivate	=	0;
 				}
 				lsPrivateLock.unlock();
@@ -138,7 +138,7 @@ class MSGBUS_LOCAL LocalSocketPrivate_Thread : public QThread
 			isStateChanged.wakeAll();
 			
 			QWriteLocker		lsPrivateLocker(&lsPrivateLock);
-			delete lsPrivate;
+			lsPrivate->deleteLater();
 			lsPrivate	=	0;
 			lsPrivateChanged.wakeAll();
 		}

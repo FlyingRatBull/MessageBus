@@ -39,6 +39,7 @@ LocalSocketPrivate_Unix::LocalSocketPrivate_Unix(LocalSocket *q)
 
 LocalSocketPrivate_Unix::~LocalSocketPrivate_Unix()
 {
+	m_readBuffer.clear();
 	close();
 }
 
@@ -241,7 +242,8 @@ void LocalSocketPrivate_Unix::readData()
 	addReadData(m_readBuffer.constData(), numRead);
 	
 	// We successfully read data -> try again
-	callSlotAuto(this, "readData");
+	// Must be called queued to prevent SIGSEGV inside Qt for some reason
+	callSlotQueued(this, "readData");
 // 	m_readNotifier->setEnabled(true);
 	
 // 	qDebug("Got data!");
@@ -406,6 +408,8 @@ bool LocalSocketPrivate_Unix::writeSocketDescriptor(quintptr socketDescriptor)
 
 quint32 LocalSocketPrivate_Unix::writeData(const char *data, quint32 size)
 {
+// 	qDebug("LocalSocketPrivate_Unix::writeData");
+	
 	if(!isOpen())
 		return 0;
 	

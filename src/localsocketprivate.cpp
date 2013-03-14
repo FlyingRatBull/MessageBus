@@ -403,6 +403,8 @@ void LocalSocketPrivate::addReadData(const char *src, int size)
 
 void LocalSocketPrivate::addReadSocketDescriptor(quintptr socketDescriptor, quintptr peerSocketDescriptor)
 {
+	Q_ASSERT(socketDescriptor > 0);
+	
 	// Following data is at least one header
 	m_remainingReadBytes	=	Header_size;
 	

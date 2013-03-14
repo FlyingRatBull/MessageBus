@@ -87,8 +87,8 @@ Variant readVariant(const QByteArray &data, quint32 &pos)
 	}
 
 	// Read data
-	QByteArray	dat(data.mid(pos, size));
+// 	QByteArray	dat(data.mid(pos, size));
 	pos	+=	size;
 
-	return Variant(dat, (Variant::Type)type);
+	return Variant(QByteArray(data.constData() + pos - size, size), (Variant::Type)type);
 }

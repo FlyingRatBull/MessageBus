@@ -34,8 +34,18 @@ class MessageBus : public QObject
 	
 	friend class MessageBusPrivate;
 	friend class MessageBusInterfacePrivate;
+	
+	Q_ENUMS(Error)
 
 	public:
+		enum Error
+		{
+			SocketError,
+			TransferDataError,
+			TransferSocketDescriptorError,
+			WaitAnswerError
+		};
+		
 		MessageBus(const QString& service, const QString& object, QObject * parent = 0);
 
 		virtual ~MessageBus();
@@ -61,8 +71,12 @@ class MessageBus : public QObject
 		
 		void setReceiver(QObject * obj);
 		
+		QString errorString() const;
+		
 	signals:
 		void disconnected();
+		
+		void error(MessageBus::Error error);
 		
 	private slots:
 		void onNewPackage();

@@ -190,6 +190,7 @@ void TestMessageBus::callVoid()
 // 	qDebug("(1) Waiting 15 seconds ...");
 // 	QTest::qWait(15000);
 	
+// 	m_peer->waitForNumCalls(1, 5000);
 	int	i	=	0;
 	while(m_peer->numCalls < 1 && i++ < 500)
 		QTest::qWait(10);
@@ -241,7 +242,7 @@ void TestMessageBus::callVoid_4()
 
 void TestMessageBus::callRet()
 {
-	QSKIP("callRet() will not work while receiver is in the same thread!", SkipAll);
+// 	QSKIP("callRet() will not work while receiver is in the same thread!", SkipAll);
 	
 	QFETCH(QList<Variant>, args);
 	QFETCH(bool, recall);
@@ -312,6 +313,10 @@ void TestMessageBus::callRet_3()
 
 void TestMessageBus::callBenchmark()
 {
+	QSKIP("Reimplement benchmark to not use qWait()", SkipAll);
+	
+	qDebug("Starting benchmark ...");
+	
 	int	calls	=	0;
 	QBENCHMARK
 	{
@@ -320,8 +325,12 @@ void TestMessageBus::callBenchmark()
 	}
 	
 	int	i	=	0;
-	while(m_peer->numCalls < calls && i++ < 50)
-		QTest::qWait(100);
+	while(m_peer->numCalls < calls && i++ < 500)
+		QTest::qWait(10);
+	
+	QVERIFY(m_peer->numCalls == calls);
+	
+	qDebug("... done");
 }
 
 
@@ -417,7 +426,9 @@ void TestMessageBus::callRet_3_data()
 
 void TestMessageBus::callArgs(int num)
 {
-	callArgs_random(num);
+// 	callArgs_random(num);
+	callArgs(num, num, false);
+	callArgs(num, num, true);
 }
 
 
@@ -472,7 +483,7 @@ void TestMessageBus::callArgs(int num, int max, bool recall)
 	
 	// Random number of arguments
 	if(num < 0)
-		num	=	qRound((qrand()/(qreal)RAND_MAX)*max);
+		num	=	qMin(qRound((qrand()/(qreal)RAND_MAX)*(max+1)), max);
 	
 	QString	callN(", num = %1%2");
 	QString	callName("%1" + callN.arg(num).arg(recall ? ", recall" : ""));

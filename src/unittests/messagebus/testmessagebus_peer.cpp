@@ -33,9 +33,41 @@ TestMessageBus_Peer::~TestMessageBus_Peer()
 }
 
 
+bool TestMessageBus_Peer::waitForNumCalls(int num, int stepTimeout)
+{
+	QReadLocker		locker(&numCallsLock);
+	
+	if(numCalls >= num)
+		return true;
+	
+	QElapsedTimer	timer;
+	timer.start();
+	while(numCalls < num)
+	{
+		QCoreApplication::processEvents();
+		// Return if we did not receive data or if we received an failure
+		timer.restart();
+		
+		quint64	old	=	numCalls;
+		if(!numCallsChanged.wait(&numCallsLock, stepTimeout))
+		{
+			if(old == numCalls)
+			{
+				if(timer.elapsed() >= stepTimeout)
+					break;
+				else
+					QCoreApplication::processEvents();
+			}
+		}
+	}
+	
+	return (numCalls >= num);
+}
+
+
 void TestMessageBus_Peer::voidCall(MessageBus *src)
 {
-	numCalls++;
+	raiseNumCalls();
 	
 	if(recall)
 		src->call("voidCall");
@@ -44,7 +76,7 @@ void TestMessageBus_Peer::voidCall(MessageBus *src)
 
 void TestMessageBus_Peer::voidCall_1(MessageBus *src, const Variant &arg1)
 {
-	numCalls++;
+	raiseNumCalls();
 
 	passedArgs.append(arg1);
 	
@@ -55,7 +87,7 @@ void TestMessageBus_Peer::voidCall_1(MessageBus *src, const Variant &arg1)
 
 void TestMessageBus_Peer::voidCall_2(MessageBus *src, const Variant &arg1, const Variant &arg2)
 {
-	numCalls++;
+	raiseNumCalls();
 
 	passedArgs.append(arg1);
 	passedArgs.append(arg2);
@@ -67,7 +99,7 @@ void TestMessageBus_Peer::voidCall_2(MessageBus *src, const Variant &arg1, const
 
 void TestMessageBus_Peer::voidCall_3(MessageBus *src, const Variant &arg1, const Variant &arg2, const Variant &arg3)
 {
-	numCalls++;
+	raiseNumCalls();
 
 	passedArgs.append(arg1);
 	passedArgs.append(arg2);
@@ -80,7 +112,7 @@ void TestMessageBus_Peer::voidCall_3(MessageBus *src, const Variant &arg1, const
 
 void TestMessageBus_Peer::voidCall_4(MessageBus *src, const Variant &arg1, const Variant &arg2, const Variant &arg3, const Variant &arg4)
 {
-	numCalls++;
+	raiseNumCalls();
 
 	passedArgs.append(arg1);
 	passedArgs.append(arg2);
@@ -94,9 +126,9 @@ void TestMessageBus_Peer::voidCall_4(MessageBus *src, const Variant &arg1, const
 
 void TestMessageBus_Peer::retCall(MessageBus *src, Variant *ret)
 {
-	qDebug("retCall");
+// 	qDebug("retCall");
 	
-	numCalls++;
+	raiseNumCalls();
 	
 	(*ret)	=	true;
 	
@@ -110,7 +142,7 @@ void TestMessageBus_Peer::retCall(MessageBus *src, Variant *ret)
 
 void TestMessageBus_Peer::retCall_1(MessageBus *src, Variant *ret, const Variant &arg1)
 {
-	numCalls++;
+	raiseNumCalls();
 	
 	(*ret)	=	arg1;
 
@@ -126,7 +158,7 @@ void TestMessageBus_Peer::retCall_1(MessageBus *src, Variant *ret, const Variant
 
 void TestMessageBus_Peer::retCall_2(MessageBus *src, Variant *ret, const Variant &arg1, const Variant &arg2)
 {
-	numCalls++;
+	raiseNumCalls();
 	
 	(*ret)	=	arg1;
 
@@ -143,7 +175,7 @@ void TestMessageBus_Peer::retCall_2(MessageBus *src, Variant *ret, const Variant
 
 void TestMessageBus_Peer::retCall_3(MessageBus *src, Variant *ret, const Variant &arg1, const Variant &arg2, const Variant &arg3)
 {
-	numCalls++;
+	raiseNumCalls();
 	
 	(*ret)	=	arg1;
 
@@ -175,4 +207,13 @@ void TestMessageBus_Peer::doRecall()
 void TestMessageBus_Peer::setOrg(MessageBus *org)
 {
 	m_org	=	org;
+}
+
+
+void TestMessageBus_Peer::raiseNumCalls()
+{
+	numCallsLock.lockForWrite();
+	numCalls++;
+	numCallsChanged.wakeAll();
+	numCallsLock.unlock();
 }

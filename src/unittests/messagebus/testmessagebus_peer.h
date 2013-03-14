@@ -34,11 +34,15 @@ class TestMessageBus_Peer : public QObject
 		
 		virtual ~TestMessageBus_Peer();
 		
+		bool waitForNumCalls(int num, int stepTimeout);
+		
 		MessageBusInterface		*	interface;
 		
 		bool							recall;
 		
 		int								numCalls;
+		QReadWriteLock		numCallsLock;
+		QWaitCondition		numCallsChanged;
 		
 		QList<Variant>		passedArgs;
 		
@@ -67,6 +71,9 @@ class TestMessageBus_Peer : public QObject
 		void doRecall();
 		
 		void setOrg(MessageBus * org);
+		
+	private:
+		void raiseNumCalls();
 		
 	private:
 		MessageBus	*	m_org;

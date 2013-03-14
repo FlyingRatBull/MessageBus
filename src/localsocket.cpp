@@ -23,11 +23,11 @@
 #include "unittests/logger.h"
 
 // How to emit signals underlying from threads
-#ifdef SIGNALS_FROM_THREADS
+// #ifdef SIGNALS_FROM_THREADS
 	#define THREAD_SIGNAL_TYPE	Qt::DirectConnection
-#else
-	#define THREAD_SIGNAL_TYPE	Qt::AutoConnection
-#endif
+// #else
+// 	#define THREAD_SIGNAL_TYPE	Qt::AutoConnection
+// #endif
 
 LocalSocket::LocalSocket(QObject * parent)
 	:	QIODevice(parent), d_ptr(new LocalSocketPrivate_Thread(this))
@@ -51,7 +51,7 @@ LocalSocket::~LocalSocket()
 	if(isOpen())
 		close();
 	
-	delete d_ptr;
+	d_ptr->deleteLater();
 }
 
 
