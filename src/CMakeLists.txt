@@ -50,6 +50,8 @@ set(INST_HEADERS
 	tsqueue.h
 	Variant
 	variant.h
+	Pointer
+	pointer.h
 )
 
 # OS specific implementations
