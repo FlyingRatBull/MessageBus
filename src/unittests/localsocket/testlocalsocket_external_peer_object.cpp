@@ -409,7 +409,8 @@ void PeerObject::checkReadData()
 				return;
 			}
 
-			data	=	m_data.takeFirst();
+			data	=	QCryptographicHash::hash(m_data.takeFirst(), QCryptographicHash::Md5);
+// 			data	=	m_data.takeFirst();
 		}
 		else if(description.first == 'p') {
 			QWriteLocker		readDataLock(&m_dataPkgLock);
@@ -419,7 +420,8 @@ void PeerObject::checkReadData()
 				return;
 			}
 
-			data	=	m_dataPkg.takeFirst();
+			data	=	QCryptographicHash::hash(m_dataPkg.takeFirst(), QCryptographicHash::Md5);
+// 			data	=	m_dataPkg.takeFirst();
 		}
 		else if(description.first == 's') {
 			QWriteLocker		readDataLock(&m_dataFDLock);

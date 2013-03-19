@@ -208,18 +208,24 @@ void LocalSocketPrivate_Unix::readData()
 	// We didn't get data
 	if(numRead < 1)
 	{
+		bool	alreadyClosed	=	false;
+		
+		// Check if socket is really open
+		// QSocketNotifier fires infinitely if reactivated and socket is closed
+		if(::write(m_socket, 0, 0) < 0)
+			alreadyClosed	=	true;
+		
 		// Read would have blocked
-		if(errno == EAGAIN || errno == EWOULDBLOCK)
+		if(!alreadyClosed && (errno == EAGAIN || errno == EWOULDBLOCK))
 		{
 			if(m_readNotifier && isOpen())
-				m_readNotifier->setEnabled(true);
+					m_readNotifier->setEnabled(true);
 			return;
 		}
 		else
 		{
-			if(numRead < 0)
-				setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
-			
+			// recv only returns -1 when no data was available
+			setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
 			return;
 		}
 	}

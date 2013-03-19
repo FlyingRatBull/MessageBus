@@ -205,11 +205,12 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 				case 0:
 				{
 					QByteArray		dataAr(data.toByteArray());
+					QByteArray		hash(QCryptographicHash::hash(dataAr, QCryptographicHash::Md5));
 					command	=	'd';
 					
 					// 				qDebug("Sending data with size %d", dataAr.size());
 					
-					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + dataAr.toHex() + "\n"), "Could not write data to peer!");
+					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + hash.toHex() + "\n"), "Could not write data to peer!");
 					
 					// size
 					quint32	size	=	qToBigEndian<quint32>(dataAr.size());
@@ -248,6 +249,8 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					sendCountData++;
 					sendBytes	+=	dataAr.size() - sizeof(size);
 					
+					dataAr.clear();
+					
 					// 				qDebug("Sent data!");
 				}break;
 				
@@ -255,13 +258,16 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 				case 1:
 				{
 					QByteArray		dataAr(data.toByteArray());
+					QByteArray		hash(QCryptographicHash::hash(dataAr, QCryptographicHash::Md5));
 					command	=	'p';
 					
-					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + dataAr.toHex() + "\n"), "Could not write data to peer!");
+					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + hash.toHex() + "\n"), "Could not write data to peer!");
 					QVERIFY2(m_localSocket->writePackage(dataAr), "Could not write package!");
 					
 					sendCountPackage++;
 					sendBytes	+=	dataAr.size();
+					
+					dataAr.clear();
 					
 					// 				qDebug("Sent package!");
 				}break;
@@ -340,10 +346,13 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	}
 	
 	// Check signal socketDescriptorWritten()
-	QList<quintptr>	emittedFdSignals(m_peer->fileDescriptorSignals());
 	QList<quintptr>	neededFdSignals;
 	foreach(QFile * file, m_openFiles.values())
 		neededFdSignals.append((quintptr)file->handle());
+	
+	QCoreApplication::processEvents();
+	
+	QList<quintptr>	emittedFdSignals(m_peer->fileDescriptorSignals());
 	
 	for(int i = 0; i < emittedFdSignals.count(); i++)
 		QVERIFY2(neededFdSignals.removeOne(emittedFdSignals[i]), qPrintable(QString("Invalid socketDescriptorWritten() signal")));
