@@ -50,7 +50,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 		~MessageBusPrivate()
 		{
 			close();
-			socket->deleteLater();
+			LocalSocket	*	s	=	socket;
+			socket	=	0;
+			delete socket;
 		}
 		
 		
@@ -122,7 +124,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 		{
 // 			qDebug("MessageBus::call - open: %s", socket->isOpen() ? "true" : "false");
 
-			if(!socket->isOpen())
+			if(!isValid())
 				return Variant();
 			
 			QElapsedTimer	elapsed;
@@ -182,10 +184,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 			foreach(int socketDescriptor, socketDescriptors)
 			{
 				// Check if socket is still open
-				if(!socket->isOpen())
+				if(!isValid())
 					return Variant();
 				
-				if(!socket->writeSocketDescriptor(socketDescriptor))
+				if(!isValid() || !socket->writeSocketDescriptor(socketDescriptor))
 				{
 					setError(MessageBus::TransferSocketDescriptorError, "Could not write socket descriptor!");
 					qDebug("MessageBus: Could not write socket descriptor (%s)!", qPrintable(socket->errorString()));
@@ -207,7 +209,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 			
 // 			qDebug("[%p] Writing call package ...", this);
 			// Write call package
-			if(!socket->writePackage(pkg))
+			if(!isValid() || !socket->writePackage(pkg))
 			{
 				setError(MessageBus::TransferDataError, "Could not write package!");
 				qDebug("MessageBus: Could not write package (%s)!", qPrintable(socket->errorString()));
@@ -274,6 +276,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 		
 		void readPackage(const QByteArray& package)
 		{
+			if(!socket)
+				return;
+			
 // 			qDebug("MessageBus::runPackage()");
 			
 			if(package.isEmpty())
@@ -374,7 +379,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 						pkg.append((const char*)(&callId), sizeof(callId));
 						
 						// Check if socket is still open
-						if(!socket->isOpen())
+						if(!isValid())
 							return;
 						
 						// Should work too if run from another thread
@@ -464,7 +469,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 							pkg.append(writeVariant(retVar));
 							
 							// Check if socket is still open
-							if(!socket->isOpen())
+							if(!isValid())
 								return;
 							
 							if(!socket->writePackage(pkg))
@@ -561,6 +566,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 		
 		void readSocketDescriptor()
 		{
+			if(!socket)
+				return;
+			
 			QWriteLocker	writeLock(&m_pendingSocketDescriptorsLock);
 			int	socketDescriptor	=	socket->readSocketDescriptor();
 			
@@ -586,7 +594,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 
 		inline bool isValid()
 		{
-			return socket->isOpen();
+			return socket && socket->isOpen();
 		}
 
 
