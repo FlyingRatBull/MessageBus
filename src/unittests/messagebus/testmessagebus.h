@@ -110,13 +110,13 @@ class TestMessageBus : public QObject
 // 		void callHeavy_data();
 		
 	private:
-		void callArgs(int num);
+		void callArgs(int num, bool addCols = true);
 		
 		void callArgs_random(int num);
 		
 		void callArgs_recall(int num, int max);
 		
-		void callArgs(int num, int max, bool recall);
+		void callArgs(int num, int max, bool recall, bool addCols = true);
 		
 	private:
 		TestMessageBus_Peer			*	m_peer;

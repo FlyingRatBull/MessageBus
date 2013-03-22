@@ -379,6 +379,9 @@ void TestMessageBus::callVoid_data()
 void TestMessageBus::callVoid_1_data()
 {
 	callArgs(1);
+	for(int i = 0; i < 1000; i++)
+		callArgs(1, false);
+	qDebug("Data generated");
 }
 
 
@@ -424,11 +427,11 @@ void TestMessageBus::callRet_3_data()
 }
 
 
-void TestMessageBus::callArgs(int num)
+void TestMessageBus::callArgs(int num, bool addCols)
 {
 // 	callArgs_random(num);
-	callArgs(num, num, false);
-	callArgs(num, num, true);
+	callArgs(num, num, false, addCols);
+	callArgs(num, num, true, addCols);
 }
 
 
@@ -475,10 +478,13 @@ void TestMessageBus::callArgs_recall(int num, int max)
 
 
 
-void TestMessageBus::callArgs(int num, int max, bool recall)
+void TestMessageBus::callArgs(int num, int max, bool recall, bool addCols)
 {
-	QTest::addColumn<QList<Variant> >("args");
-	QTest::addColumn<bool>("recall");
+	if(addCols)
+	{
+		QTest::addColumn<QList<Variant> >("args");
+		QTest::addColumn<bool>("recall");
+	}
 	QList<Variant>	args;
 	
 	// Random number of arguments

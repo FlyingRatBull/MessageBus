@@ -212,7 +212,8 @@ void LocalSocketPrivate_Unix::readData()
 		
 		// Check if socket is really open
 		// QSocketNotifier fires infinitely if reactivated and socket is closed
-		if(::write(m_socket, 0, 0) < 0)
+		int	r	=	fcntl(m_socket, F_GETFL);
+		if(r == -1 || !(r & (O_RDONLY | O_RDWR)))
 			alreadyClosed	=	true;
 		
 		// Read would have blocked
