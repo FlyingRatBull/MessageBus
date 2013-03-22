@@ -376,8 +376,10 @@ bool LocalSocketPrivate_Unix::writeSocketDescriptor(quintptr socketDescriptor)
 		return false;
 	
 	struct	msghdr		msgHeader;
+	bzero(&msgHeader, sizeof(msgHeader));
 	char							ccmsg[CMSG_SPACE(sizeof(socketDescriptor))];
 	struct	iovec			data;	/* stupidity: must send/receive at least one byte */
+	bzero(&data, sizeof(data));
 	void						*	str	=	(void*)&socketDescriptor;
 	int								rv;
 	
