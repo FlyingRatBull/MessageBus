@@ -180,6 +180,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 // 			qDebug("[0x%08X] Writing socket descriptors ...", (int)this);
 			foreach(int socketDescriptor, socketDescriptors)
 			{
+				// Check if socket is still open
+				if(!socket->isOpen())
+					return Variant();
+				
 				if(!socket->writeSocketDescriptor(socketDescriptor))
 				{
 					setError(MessageBus::TransferSocketDescriptorError, "Could not write socket descriptor!");
@@ -368,6 +372,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 						pkg.append(&c, 1);
 						pkg.append((const char*)(&callId), sizeof(callId));
 						
+						// Check if socket is still open
+						if(!socket->isOpen())
+							return;
+						
 						// Should work too if run from another thread
 						if(!socket->writePackage(pkg))
 						{
@@ -454,6 +462,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 							pkg.append((const char*)(&callId), sizeof(callId));
 							pkg.append(writeVariant(retVar));
 							
+							// Check if socket is still open
+							if(!socket->isOpen())
+								return;
+							
 							if(!socket->writePackage(pkg))
 							{
 								setError(MessageBus::TransferDataError, "Could not write return value!");
@@ -462,7 +474,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 							}
 							else if(retVar.type() == Variant::SocketDescriptor)
 								// Write socket descriptor
-							socket->writeSocketDescriptor(retVar.toSocketDescriptor());
+								socket->writeSocketDescriptor(retVar.toSocketDescriptor());
 						}
 						
 						if(!ret)
