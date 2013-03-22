@@ -51,7 +51,7 @@ LocalSocket::~LocalSocket()
 	if(isOpen())
 		close();
 	
-	d_ptr->deleteLater();
+	delete d_ptr;
 }
 
 
