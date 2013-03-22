@@ -477,6 +477,10 @@ void LocalSocketPrivate::setError(LocalSocket::LocalSocketError socketError, con
 // 	qDebug("--- setError(): %s", qPrintable(errorText));
 	
 // 	Logger::log("Bytes written (LocalSocketPrivate)", 0, "E", "Error:\n" + errorText);
+
+	// Throw away consequential errors
+	if(m_hasError)
+		return;
 	
 	m_hasError	=	true;
 	
