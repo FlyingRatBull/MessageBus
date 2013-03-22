@@ -50,6 +50,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 		~MessageBusPrivate()
 		{
 			close();
+			socket->deleteLater();
 		}
 		
 		
