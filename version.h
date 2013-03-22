@@ -1,5 +1,5 @@
-#define VERSION "0.5.19"
+#define VERSION "0.5.20"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 5
-#define VERSION_PATCH 19
+#define VERSION_PATCH 20
 #define VERSION_EXTRA 0
