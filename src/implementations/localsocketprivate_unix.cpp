@@ -141,16 +141,13 @@ void LocalSocketPrivate_Unix::close()
 		m_readNotifier	=	0;
 	}
 	
-	if(m_socket <= 0)
-		return;
-	
 // 	qDebug("LocalSocketPrivate_Unix::close()");
 	
-	if(::close(m_socket) != 0)
+	if(m_socket && ::close(m_socket) != 0)
 	{
+		m_socket	=	0;
 		///@todo Analyze errno
 		setError(LocalSocket::SocketAccessError, "Could not close socket!");
-		return;
 	}
 	
 	m_socket	=	0;
@@ -208,19 +205,20 @@ void LocalSocketPrivate_Unix::readData()
 	// We didn't get data
 	if(numRead < 1)
 	{
-		bool	alreadyClosed	=	false;
-		
-		// Check if socket is really open
-		// QSocketNotifier fires infinitely if reactivated and socket is closed
-		int	numWritten	=	::send(m_socket, 0, 0, MSG_NOSIGNAL);
-
-		// We couldn't write data
-		if(numWritten < 0)
-			alreadyClosed	=	true;
-		
 		// Read would have blocked
-		if(!alreadyClosed && (errno == EAGAIN || errno == EWOULDBLOCK))
+		if(errno == EAGAIN || errno == EWOULDBLOCK)
 		{
+			// Check if socket is really open
+			// QSocketNotifier fires infinitely if reactivated and socket is closed
+			int	numWritten	=	::send(m_socket, 0, 0, MSG_NOSIGNAL);
+
+			// We couldn't write data => Socket is closed
+			if(numWritten < 0)
+			{
+				close();
+				return;
+			}
+			
 			if(m_readNotifier && isOpen())
 				m_readNotifier->setEnabled(true);
 			return;
@@ -228,7 +226,13 @@ void LocalSocketPrivate_Unix::readData()
 		else
 		{
 			// recv only returns -1 when no data was available
-			setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
+			
+			// The socket is closed
+			if(errno == ENOTCONN || errno == ECONNRESET)
+				close();
+			else
+				setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
+			
 			return;
 		}
 	}

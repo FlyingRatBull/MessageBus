@@ -459,8 +459,9 @@ void LocalSocketPrivate::setClosed()
 	if(!m_isOpen)
 		return;
 	
-	emit(disconnected());
 	m_isOpen	=	false;
+	
+	emit(disconnected());
 	
 	m_currentReadPackage.clear();
 	m_currentWritePackage.clear();
@@ -480,7 +481,11 @@ void LocalSocketPrivate::setError(LocalSocket::LocalSocketError socketError, con
 	m_hasError	=	true;
 	
 	emit(error(socketError, errorText));
-	close();
+	if(m_isOpen)
+	{
+		close();
+		setClosed();
+	}
 }
 
 

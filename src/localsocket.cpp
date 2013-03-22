@@ -64,6 +64,9 @@ void LocalSocket::connectToServer(const QString& name, QIODevice::OpenMode mode)
 		return;
 	}
 	
+	if(d_ptr->isRunning())
+		d_ptr->close();
+	
 	d_ptr->start();
 	
 	// Wait for LocalSocketPrivate instance to be ready
@@ -107,6 +110,9 @@ bool LocalSocket::setSocketDescriptor(quintptr socketDescriptor, LocalSocket::Lo
 {
 	if(d_ptr->state != UnconnectedState)
 		return false;
+	
+	if(d_ptr->isRunning())
+		d_ptr->close();
 	
 	d_ptr->start();
 	
