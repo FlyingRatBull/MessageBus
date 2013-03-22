@@ -45,6 +45,12 @@ class MSGBUS_LOCAL LocalSocketPrivate_Thread : public QThread
 		}
 		
 		
+		~LocalSocketPrivate_Thread()
+		{
+			close();
+		}
+		
+		
 		void reset()
 		{
 			// readBufferSize is not effected by reset because it lasts over mutliplt connect() attempts
@@ -59,6 +65,15 @@ class MSGBUS_LOCAL LocalSocketPrivate_Thread : public QThread
 			QThread::exit(0);
 			
 			QReadLocker	locker(&lsPrivateLock);
+			
+			areBytesWritten.wakeAll();
+			isPackageWritten.wakeAll();
+			isSocketDescriptorWritten.wakeAll();
+			isReadyRead.wakeAll();
+			isReadyReadPackage.wakeAll();
+			isReadyReadSocketDescriptor.wakeAll();
+			isStateChanged.wakeAll();
+			
 			
 			if(lsPrivate)
 				lsPrivateChanged.wait(&lsPrivateLock, 10000);
