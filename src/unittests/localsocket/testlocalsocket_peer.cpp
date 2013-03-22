@@ -23,7 +23,7 @@
 #include "../logger.h"
 
 TestLocalSocket_Peer::TestLocalSocket_Peer()
-	:	QObject(), m_extProcess(0), m_socket(0), m_localCtrlServer(0), m_peerSocket(0), m_recSuccessCount(0)
+	:	QObject(), m_extProcess(0), m_socket(0), m_localCtrlServer(0), m_peerSocket(0), m_recSuccessCount(0), m_recDisconnectedSignal(false)
 {
 }
 
@@ -198,6 +198,17 @@ bool TestLocalSocket_Peer::waitForTotalSuccessCount(quint64 numSuccess, int step
 }
 
 
+bool TestLocalSocket_Peer::waitForDisconnectedSignal(int timeout)
+{
+	QReadLocker		readLocker(&m_recDiscLock);
+	
+	if(m_recDisconnectedSignal)
+		return true;
+	
+	return m_recDiscSignalChanged.wait(&m_recDiscLock, timeout);
+}
+
+
 bool TestLocalSocket_Peer::writeControlData(const QByteArray &data)
 {
 	m_writeControlData.enqueue(data);
@@ -206,6 +217,15 @@ bool TestLocalSocket_Peer::writeControlData(const QByteArray &data)
 		qFatal("Auto slot call of \"writeControlData\" failed!");
 	
 	return true;
+}
+
+
+void TestLocalSocket_Peer::stopProcess()
+{
+	if(!m_extProcess || !m_extProcess->isOpen())
+		return;
+	
+	m_extProcess->terminate();
 }
 
 
@@ -269,6 +289,7 @@ void TestLocalSocket_Peer::onNewConnection(quintptr socketDescriptor)
 	m_socket	=	new LocalSocket(this);
 	
 	connect(m_socket, SIGNAL(socketDescriptorWritten(quintptr)), SLOT(fileDescriptorWritten(quintptr)));
+	connect(m_socket, SIGNAL(disconnected()), SLOT(onDisconnected()), Qt::DirectConnection);
 	
 	m_socket->setSocketDescriptor(socketDescriptor);
 	
@@ -409,4 +430,13 @@ void TestLocalSocket_Peer::fileDescriptorWritten(quintptr fd)
 	QWriteLocker		locker(&m_recFileDescSignalsLock);
 	
 	m_recFileDescSignals.append(fd);
+}
+
+
+void TestLocalSocket_Peer::onDisconnected()
+{
+	QWriteLocker		readLocker(&m_recDiscLock);
+	
+	m_recDisconnectedSignal	=	true;
+	m_recDiscSignalChanged.wakeAll();
 }

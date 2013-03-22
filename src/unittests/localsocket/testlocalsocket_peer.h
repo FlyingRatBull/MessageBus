@@ -44,7 +44,11 @@ class TestLocalSocket_Peer : public QObject
 		
 		bool waitForTotalSuccessCount(quint64 numSuccess, int stepTimeout = 0);
 		
+		bool waitForDisconnectedSignal(int timeout = 0);
+		
 		bool writeControlData(const QByteArray &data);
+		
+		void stopProcess();
 		
 		quint64 totalSuccessCount() const;
 		
@@ -71,6 +75,8 @@ class TestLocalSocket_Peer : public QObject
 		void writeControlData();
 		
 		void fileDescriptorWritten(quintptr fd);
+		
+		void onDisconnected();
 		
 	private:
 		// External peer process
@@ -103,6 +109,11 @@ class TestLocalSocket_Peer : public QObject
 		QStringList									m_recFailureMessages;
 		mutable	QReadWriteLock			m_recLock;
 		QWaitCondition							m_recValuesChanged;
+		
+		// Received disconnected signal
+		bool												m_recDisconnectedSignal;
+		mutable	QReadWriteLock			m_recDiscLock;
+		QWaitCondition							m_recDiscSignalChanged;
 };
 
 #endif // TESTLOCALSOCKET_PEER_H

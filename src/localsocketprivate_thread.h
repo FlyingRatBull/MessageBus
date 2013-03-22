@@ -208,6 +208,9 @@ class MSGBUS_LOCAL LocalSocketPrivate_Thread : public QThread
 				isStateChanged.wakeAll();
 			}
 			
+			// Stop thread
+			QThread::exit(0);
+			
 			emit(stateChanged(state));
 			emit(disconnected());
 			

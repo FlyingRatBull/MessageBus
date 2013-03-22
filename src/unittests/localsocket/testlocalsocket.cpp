@@ -107,6 +107,12 @@ void TestLocalSocket::cleanup()
 	
 	if(m_peerThread)
 	{
+		// Stop external process
+		m_peerThread->peer()->stopProcess();
+		
+		// Wait for disconnected signal
+		QVERIFY(m_peerThread->peer()->waitForDisconnectedSignal(5000));
+		
 		/// Thread doesn't exit
 		m_peerThread->quit();
 		
