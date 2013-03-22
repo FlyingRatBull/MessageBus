@@ -34,14 +34,14 @@ class MSGBUS_LOCAL MessageBusPrivate
 {
 	public:
 		MessageBusPrivate(const QString& service, const QString& objectName, QObject * object, MessageBus * parent)
-		:	socket(new LocalSocket(parent)), p(parent), obj(object), m_dropNextSocketDescriptors(0), sName(socketName(service, objectName))
+		:	socket(new LocalSocket(parent)), p(parent), obj(object), m_dropNextSocketDescriptors(0), sName(socketName(service, objectName)), m_closed(false)
 		{
 // 				dbg("socket: 0x%08X", (uint)socket)
 		}
 		
 		
 		MessageBusPrivate(QObject * object, LocalSocket * sock, MessageBus * parent)
-		:	socket(sock), p(parent), obj(object), m_dropNextSocketDescriptors(0)
+		:	socket(sock), p(parent), obj(object), m_dropNextSocketDescriptors(0), m_closed(false)
 		{
 			socket->setParent(parent);
 		}
@@ -80,6 +80,11 @@ class MSGBUS_LOCAL MessageBusPrivate
 		
 		void close()
 		{
+			if(m_closed)
+				return;
+			
+			m_closed	=	true;
+			
 			// Wake up all waiting calls
 			{
 				QReadLocker	readLock(&(m_returnValuesLock));
@@ -606,6 +611,8 @@ class MSGBUS_LOCAL MessageBusPrivate
 		LocalSocket					*	socket;
 		/// Last error string
 		QString								m_errorString;
+		/// Closed?
+		bool									m_closed;
 		
 		/// Name of socket to connect to
 		QString								sName;
