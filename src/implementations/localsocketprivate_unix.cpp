@@ -228,7 +228,7 @@ void LocalSocketPrivate_Unix::readData()
 			// recv only returns -1 when no data was available
 			
 			// The socket is closed
-			if(errno == ENOTCONN || errno == ECONNRESET)
+			if(errno == ENOTCONN || errno == ECONNRESET || ENOTSOCK)
 				close();
 			else
 				setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
@@ -312,8 +312,12 @@ bool LocalSocketPrivate_Unix::readSocketDescriptor()
 		}
 		else
 		{
-// 			qDebug("!!! Cannot read socket descriptor");
-			setError(LocalSocket::SocketAccessError, "Cannot read socket descriptor from socket!");
+			// The socket is closed
+			if(errno == ENOTCONN || errno == ECONNRESET || ENOTSOCK)
+				close();
+			else
+				setError(LocalSocket::SocketAccessError, QString("Could not read from socket: %1").arg(strerror(errno)));
+			
 			return true;
 		}
 	}
@@ -411,7 +415,12 @@ bool LocalSocketPrivate_Unix::writeSocketDescriptor(quintptr socketDescriptor)
 	
 	if(rv < 1)
 	{
-		setError(LocalSocket::SocketAccessError, "Cannot write socket descriptor to socket!");
+		// The socket is closed
+		if(errno == ENOTCONN || errno == ECONNRESET || ENOTSOCK)
+			close();
+		else
+			setError(LocalSocket::SocketAccessError, QString("Could write socket descriptor: %1").arg(strerror(errno)));
+
 		return false;
 	}
 	else
@@ -440,7 +449,12 @@ quint32 LocalSocketPrivate_Unix::writeData(const char *data, quint32 size)
 		}
 		else
 		{
-			setError(LocalSocket::SocketAccessError, QString("Could not write to socket: %1").arg(strerror(errno)));
+			// The socket is closed
+			if(errno == ENOTCONN || errno == ECONNRESET || ENOTSOCK)
+				close();
+			else
+				setError(LocalSocket::SocketAccessError, QString("Could write to socket: %1").arg(strerror(errno)));
+
 			return 0;
 		}
 	}
