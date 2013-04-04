@@ -237,7 +237,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 				
 				// Wait for call to be transferred
 				if(!retVal->callTransferred)
-					retVal->isCallTransferred.wait(&retVal->lock, (timeout > 0 ? timeout - elapsed.elapsed() : 30000));
+					retVal->isCallTransferred.wait(&retVal->lock, (timeout > 0 ? timeout : m_callRetTimeout) - elapsed.elapsed());
 				
 				if(!retVal->callTransferred)
 				{
@@ -261,7 +261,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 					
 					// Wait for return value to be available
 					if(!retVal->val.isValid())
-						retVal->isValAvailable.wait(&retVal->lock, (timeout > 0 ? timeout - elapsed.elapsed() : 30000));
+						retVal->isValAvailable.wait(&retVal->lock, (timeout > 0 ? timeout : m_callRetTimeout) - elapsed.elapsed());
 					
 					if(!retVal->val.isValid())
 					{
@@ -376,7 +376,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 							QReadLocker	readLock(&m_pendingSocketDescriptorsLock);
 						
 							if(m_pendingSocketDescriptors.isEmpty())
-								m_pendingSocketDescriptorsNonEmpty.wait(&m_pendingSocketDescriptorsLock, 30000);
+								m_pendingSocketDescriptorsNonEmpty.wait(&m_pendingSocketDescriptorsLock, m_callRetTimeout);
 							
 							if(m_pendingSocketDescriptors.isEmpty())
 							{
@@ -546,7 +546,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 						{
 							// We don't need the lock on the ret val while we wait on the socket descriptor
 							writeLock.unlock();
-							m_pendingSocketDescriptorsNonEmpty.wait(&m_pendingSocketDescriptorsLock, 30000);
+							m_pendingSocketDescriptorsNonEmpty.wait(&m_pendingSocketDescriptorsLock, m_callRetTimeout);
 							writeLock.relock();
 						}
 						
@@ -640,6 +640,13 @@ class MSGBUS_LOCAL MessageBusPrivate
 			m_delReturnValues	=	m_returnValues;
 			m_returnValues	=	tmp;
 		}
+		
+		
+		void setCallRetTimeout(int ms)
+		{
+			m_callRetTimeout	=	ms;
+			m_delReturnValuesTimer.setInterval(m_callRetTimeout);
+		}
 
 
 		/// Parent MessageBus object
@@ -652,6 +659,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 		QString								m_errorString;
 		/// Closed?
 		bool									m_closed;
+		
+		/// Timeout of callRet
+		int										m_callRetTimeout;
 		
 		/// Name of socket to connect to
 		QString								sName;
@@ -704,7 +714,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 MessageBus::MessageBus(const QString& service, const QString& object, QObject * parent)
 		:	QObject(parent), d(new MessageBusPrivate(service, object, parent, this))
 {
-	d->m_delReturnValuesTimer.setInterval(35000);
+	setCallRetTimeout(30000);
 	connect(&d->m_delReturnValuesTimer, SIGNAL(timeout()), SLOT(timerCheck()));
 	d->m_delReturnValuesTimer.start();
 	
@@ -724,7 +734,7 @@ MessageBus::MessageBus(const QString& service, const QString& object, QObject * 
 MessageBus::MessageBus(QObject * target, LocalSocket * socket, QObject * parent)
 		:	QObject(parent), d(new MessageBusPrivate(target, socket, this))
 {
-	d->m_delReturnValuesTimer.setInterval(35000);
+	setCallRetTimeout(30000);
 	connect(&d->m_delReturnValuesTimer, SIGNAL(timeout()), SLOT(timerCheck()));
 	d->m_delReturnValuesTimer.start();
 	
@@ -741,6 +751,13 @@ MessageBus::~MessageBus()
 {
 	close();
 	delete d;
+}
+
+
+void MessageBus::setCallRetTimeout(int ms)
+{
+	ms	=	qMax(ms, 1);
+	d->setCallRetTimeout(ms);
 }
 
 

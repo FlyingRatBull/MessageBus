@@ -49,6 +49,8 @@ class MessageBus : public QObject
 		MessageBus(const QString& service, const QString& object, QObject * parent = 0);
 
 		virtual ~MessageBus();
+		
+		void setCallRetTimeout(int ms = 30000);
 
 		///@warning callRet() must not be called within a function that is called by callRet() itself!
 		Variant callRet(const QString& slot, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant());
