@@ -85,6 +85,8 @@ class MessageBus : public QObject
 		
 		void onDisconnected();
 		
+		void timerCheck();
+		
 	private:
 		MSGBUS_LOCAL	MessageBus(QObject * target, LocalSocket * socket, QObject * parent);
 

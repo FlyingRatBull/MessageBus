@@ -29,16 +29,36 @@ class TestPointer : public QObject
 	private slots:
 		void single();
 		
-		void multi10();
+		void multiRef10();
 		
-		void multi100();
+		void multiRef100();
 		
-		void multi1000();
+		void multiRef1000();
 		
-		void multi10000();
+		void multiRef10000();
+		
+		void multiVal10();
+		
+		void multiVal100();
+		
+		void multiVal1000();
+		
+		void multiVal10000();
+		
+		void multiValMultiRef10();
+		
+		void multiValMultiRef100();
+		
+		void multiValMultiRef1000();
+		
+		void multiValMultiRef10000();
 		
 	private:
-		void multi(int count);
+		void multiRef(int count);
+		
+		void multiVal(int count);
+		
+		void multiValMultiRef(int count);
 };
 
 #endif // TESTPOINTER_H

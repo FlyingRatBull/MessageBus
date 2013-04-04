@@ -135,7 +135,7 @@ void TestQueue::ts_dequeueData()
 	
 	QVERIFY(queue.size() == orgData.size());
 	
-	qsrand((uint)this + QTime::currentTime().msec());
+	qsrand(QTime::currentTime().msec());
 
 	uint	pos	=	0;
 	while(!queue.isEmpty())
@@ -251,7 +251,7 @@ void TestQueue::ts_queueItems_data()
 {
 	QTest::addColumn<QByteArrayList>("data");
 	
-	qsrand((uint)this);
+	qsrand(QTime::currentTime().msec());
 	QByteArrayList	ret;
 	
 	for(int i = 0; i < 10000; i++)
@@ -303,7 +303,7 @@ void TestQueue::benchmark_data()
 {
 	QTest::addColumn<QByteArrayList>("data");
 	
-	qsrand((uint)this);
+	qsrand(QTime::currentTime().msec());
 	QByteArrayList	ret;
 	
 	for(int i = 0; i < 10000; i++)

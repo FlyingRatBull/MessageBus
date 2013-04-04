@@ -37,6 +37,8 @@ class MSGBUS_LOCAL MessageBusPrivate
 		:	socket(new LocalSocket(parent)), p(parent), obj(object), m_dropNextSocketDescriptors(0), sName(socketName(service, objectName)), m_closed(false)
 		{
 // 				dbg("socket: 0x%08X", (uint)socket)
+			m_returnValues		=	&m_retVals1;
+			m_delReturnValues	=	&m_retVals2;
 		}
 		
 		
@@ -44,6 +46,9 @@ class MSGBUS_LOCAL MessageBusPrivate
 		:	socket(sock), p(parent), obj(object), m_dropNextSocketDescriptors(0), m_closed(false)
 		{
 			socket->setParent(parent);
+			
+			m_returnValues		=	&m_retVals1;
+			m_delReturnValues	=	&m_retVals2;
 		}
 
 
@@ -88,14 +93,17 @@ class MSGBUS_LOCAL MessageBusPrivate
 			// Wake up all waiting calls
 			{
 				QReadLocker	readLock(&(m_returnValuesLock));
-				foreach(quint64 id, m_returnValues.keys())
-					m_returnValues[id]->isValAvailable.wakeAll();
+				foreach(quint64 id, m_returnValues->keys())
+					m_returnValues->value(id)->isValAvailable.wakeAll();
+				foreach(quint64 id, m_delReturnValues->keys())
+					m_delReturnValues->value(id)->isValAvailable.wakeAll();
 			}
 			
 			// Remove all return values ( Will be deleted automatically)
 			{
 				QWriteLocker	writeLock(&(m_returnValuesLock));
-				m_returnValues.clear();
+				m_returnValues->clear();
+				m_delReturnValues->clear();
 			}
 			
 			if(isValid())
@@ -209,7 +217,7 @@ class MSGBUS_LOCAL MessageBusPrivate
 				
 				// Safely insert return struct
 				QWriteLocker	writeLock(&m_returnValuesLock);
-				m_returnValues[callId]	=	retVal;
+				m_returnValues->insert(callId, retVal);
 			}
 			
 // 			qDebug("[%p] Writing call package ...", this);
@@ -257,6 +265,14 @@ class MSGBUS_LOCAL MessageBusPrivate
 					
 					if(!retVal->val.isValid())
 					{
+						readLocker.unlock();
+						// Remove return value
+						{
+							QWriteLocker	writeLock(&m_returnValuesLock);
+							m_returnValues->remove(callId);
+							m_delReturnValues->remove(callId);
+						}
+						
 						setError(MessageBus::WaitAnswerError, "Failed to wait for return value!");
 						qDebug("MessageBus: Failed to wait for return value!");
 						return	Variant();
@@ -270,7 +286,8 @@ class MSGBUS_LOCAL MessageBusPrivate
 					// Remove return value
 					{
 						QWriteLocker	writeLock(&m_returnValuesLock);
-						m_returnValues.remove(callId);
+						m_returnValues->remove(callId);
+						m_delReturnValues->remove(callId);
 					}
 					
 					return ret;
@@ -499,15 +516,19 @@ class MSGBUS_LOCAL MessageBusPrivate
 					// Read locker must be locked as long as we use retVal as retVal could be deleted otherwise
 					QReadLocker	readLock(&m_returnValuesLock);
 					
+					Pointer<RetVal>	retVal(m_returnValues->value(callId));
+					
+					if(retVal == 0)
+						retVal	=	m_delReturnValues->value(callId);
+					
 					// We don't have an registered ret value for this call id
-					if(!m_returnValues.contains(callId))
+					if(retVal == 0)
 					{
 						setError(MessageBus::TransferDataError, "Invalid package received!");
 						qDebug("MessageBus: Return value with invalid call id received!");
 						return;
 					}
 					
-					Pointer<RetVal>	retVal(m_returnValues[callId]);
 					readLock.unlock();
 					
 					QWriteLocker	writeLock(&retVal->lock);
@@ -546,18 +567,22 @@ class MSGBUS_LOCAL MessageBusPrivate
 					
 				case CallRecv:
 				{
-					// Read locker must be locked as long as we use retVal as retVal could be deleted otherwise
+					// Read locker can be unlocked directly as retVal is used within an managed pointer
 					QReadLocker	readLock(&m_returnValuesLock);
 					
+					Pointer<RetVal>	retVal(m_returnValues->value(callId));
+					
+					if(retVal == 0)
+						retVal	=	m_delReturnValues->value(callId);
+					
 					// We don't have an registered ret value for this call id
-					if(!m_returnValues.contains(callId))
+					if(retVal == 0)
 					{
 						setError(MessageBus::TransferDataError, "Invalid package received!");
 						qDebug("MessageBus: Return value with invalid call id received!");
 						return;
 					}
 					
-					Pointer<RetVal>	retVal(m_returnValues[callId]);
 					readLock.unlock();
 					
 					QWriteLocker	writeLock(&retVal->lock);
@@ -601,6 +626,20 @@ class MSGBUS_LOCAL MessageBusPrivate
 		{
 			return socket && socket->isOpen();
 		}
+		
+		
+		void timerCheck()
+		{
+			// Delete timed out return values
+			QWriteLocker		locker(&m_returnValuesLock);
+			
+			m_delReturnValues->clear();
+			
+			// Swap pointers
+			QHash<int, Pointer<RetVal>	>	*	tmp	=	m_delReturnValues;
+			m_delReturnValues	=	m_returnValues;
+			m_returnValues	=	tmp;
+		}
 
 
 		/// Parent MessageBus object
@@ -639,10 +678,14 @@ class MSGBUS_LOCAL MessageBusPrivate
 		};
 		
 		/// Return values by call id
-		QHash<int, Pointer<RetVal>	>		m_returnValues;
-		/// Mutex for m_returnValues
-		QMutex								m_returnValuesMutex;
-		/// Read/Write Lock for m_returnValuesMutex
+		QHash<int, Pointer<RetVal>	>		m_retVals1;
+		QHash<int, Pointer<RetVal>	>		m_retVals2;
+		QHash<int, Pointer<RetVal>	>	*	m_returnValues;
+		/// To be deleted return values
+		QHash<int, Pointer<RetVal>	>	*	m_delReturnValues;
+		/// Return values deletion timer
+		QTimer													m_delReturnValuesTimer;
+		/// Read/Write Lock for m_returnValues and m_delReturnValues
 		QReadWriteLock				m_returnValuesLock;
 		
 		/// Received socket descriptors
@@ -661,6 +704,10 @@ class MSGBUS_LOCAL MessageBusPrivate
 MessageBus::MessageBus(const QString& service, const QString& object, QObject * parent)
 		:	QObject(parent), d(new MessageBusPrivate(service, object, parent, this))
 {
+	d->m_delReturnValuesTimer.setInterval(35000);
+	connect(&d->m_delReturnValuesTimer, SIGNAL(timeout()), SLOT(timerCheck()));
+	d->m_delReturnValuesTimer.start();
+	
 // 		connect(d->socket, SIGNAL(socketDescriptorAvailable()), this, SLOT(fetchSocketDescriptor()));
 // 	connect(d->socket, SIGNAL(socketDescriptorReceived(int)), SIGNAL(socketDescriptorReceived(int)), Qt::DirectConnection);
 	connect(d->socket, SIGNAL(readyReadPackage()), SLOT(onNewPackage()), Qt::DirectConnection);
@@ -677,6 +724,10 @@ MessageBus::MessageBus(const QString& service, const QString& object, QObject * 
 MessageBus::MessageBus(QObject * target, LocalSocket * socket, QObject * parent)
 		:	QObject(parent), d(new MessageBusPrivate(target, socket, this))
 {
+	d->m_delReturnValuesTimer.setInterval(35000);
+	connect(&d->m_delReturnValuesTimer, SIGNAL(timeout()), SLOT(timerCheck()));
+	d->m_delReturnValuesTimer.start();
+	
 // 	connect(d->socket, SIGNAL(socketDescriptorReceived(int)), this, SIGNAL(socketDescriptorReceived(int)), Qt::DirectConnection);
 	connect(d->socket, SIGNAL(readyReadPackage()), SLOT(onNewPackage()), Qt::DirectConnection);
 	connect(d->socket, SIGNAL(readyReadSocketDescriptor()), SLOT(onNewSocketDescriptor()), Qt::DirectConnection);
@@ -820,6 +871,12 @@ void MessageBus::onDisconnected()
 	close();
 	
 	emit(disconnected());
+}
+
+
+void MessageBus::timerCheck()
+{
+	d->timerCheck();
 }
 
 

@@ -105,7 +105,7 @@ class Pointer
 			
 			// Get counter
 			s_ValueCounterLock.lockForRead();
-			m_counter	=	s_valueCounter[newValue];
+			m_counter	=	s_valueCounter.value(newValue, 0);
 			s_ValueCounterLock.unlock();
 			
 			// No counter yet -> register new counter
@@ -114,12 +114,12 @@ class Pointer
 				s_ValueCounterLock.lockForWrite();
 				
 				// A new counter could be created in the meantime -> recheck
-				m_counter	=	s_valueCounter[newValue];
+				m_counter	=	s_valueCounter.value(newValue, 0);
 				
 				if(!m_counter)
 				{
 					m_counter	=	new QAtomicInt();
-					s_valueCounter[newValue]	=	m_counter;
+					s_valueCounter.insert(newValue, m_counter);
 				}
 				
 				s_ValueCounterLock.unlock();

@@ -19,7 +19,6 @@
 #include "tools.h"
 
 #include <QCoreApplication>
-#include <QHash>
 #include <QTimer>
 #include <QMetaMethod>
 #include <QStringList>
