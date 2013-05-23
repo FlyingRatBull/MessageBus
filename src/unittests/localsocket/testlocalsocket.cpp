@@ -240,7 +240,8 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 						QVERIFY2(tmp >= 0, qPrintable(QString("Could not write all data to peer! (" + m_localSocket->errorString() + ")")));
 						
 						written	+=	tmp;
-						QCoreApplication::processEvents();
+// 						QCoreApplication::processEvents();
+						m_localSocket->waitForBytesWritten(3000);
 					}
 					
 					// For debugging
@@ -268,7 +269,16 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					command	=	'p';
 					
 					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + hash.toHex() + "\n"), "Could not write data to peer!");
-					QVERIFY2(m_localSocket->writePackage(dataAr), "Could not write package!");
+					
+					bool result = m_localSocket->writePackage(dataAr);
+					
+					while(!result && m_localSocket->isOpen())
+					{
+						m_localSocket->waitForPackageWritten(30000);
+						result = m_localSocket->writePackage(dataAr);
+					}
+						
+					QVERIFY2(result, "Could not write package!");
 					
 					sendCountPackage++;
 					sendBytes	+=	dataAr.size();

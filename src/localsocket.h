@@ -122,6 +122,14 @@ class LocalSocket : public QIODevice
 		
 		void setReadBufferSize(qint64 size);
 		
+		qint64 writeBufferSize() const;
+		
+		void setWriteBufferSize(qint64 size);
+		
+		qint64 writePkgBufferSize() const;
+		
+		void setWritePkgBufferSize(qint64 size);
+		
 		bool waitForConnected(int msecs = 30000);
 		
 		bool waitForDisconnected(int msecs = 30000);

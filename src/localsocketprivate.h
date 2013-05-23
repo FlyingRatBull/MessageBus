@@ -85,6 +85,16 @@ class MSGBUS_LOCAL LocalSocketPrivate : public QObject
 		
 		qint64 writeBufferSize() const;
 		
+		qint64 writePkgBufferSize() const;
+		
+		qint64 maxWriteDataBufferSize() const;
+		
+		void setMaxWriteDataBufferSize(qint64 size);
+		
+		qint64 maxWritePkgBufferSize() const;
+		
+		void setMaxWritePkgBufferSize(qint64 size);
+		
 		qint64 writePackageBufferSize() const;
 		
 		qint64 writeSocketDescriptorBufferSize() const;
@@ -201,11 +211,16 @@ class MSGBUS_LOCAL LocalSocketPrivate : public QObject
 		
 		TsDataQueue							m_writeDataBuffer;
 		TsQueue<QByteArray>			m_writePkgBuffer;
+		QAtomicInt							m_writePkgBufferSize;
 		TsQueue<int>						m_writeSDescBuffer;
 		
 		/// Buffer for outgoing data
 		QByteArray							m_writeBuffer;
 		
+		/// Maximum write buffer size
+		qint64									m_maxWriteDataBufferSize;
+		/// Maximum package buffer size
+		qint64									m_maxWritePkgBufferSize;
 		/// Read buffer size
 		qint64									m_readBufferSize;
 		///Temporary read buffer (until one whole data portion is readable)

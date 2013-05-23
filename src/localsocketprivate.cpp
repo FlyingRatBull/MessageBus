@@ -54,16 +54,22 @@ QEvent::Type LocalSocketPrivateEvent::LocalSocketPrivateType	=	QEvent::None;
 ///@todo Implement command for informing about the buffer sizes
 
 /*
+ * Definitions: Default values
+ */
+#define DEF_MAX_WRITE_DATA_BUF_SIZE 262144	// 256kb
+#define DEF_MAX_WRITE_PKG_BUF_SIZE 262144	// 256kb
+
+/*
  * Functions
  */
 #define INIT_HEADER(_header,_size,_cmd,_dataPtr) {(_header).cmd=qToBigEndian<quint32>(_cmd);(_header).size=qToBigEndian<quint32>(_size);(_header).crc16=qChecksum((_dataPtr),(_size));(_header).bigEndian=true;}
 #define CORRECT_HEADER(_header) {if((_header).bigEndian){(_header).cmd=qFromBigEndian<quint32>((_header).cmd);(_header).size=qFromBigEndian<quint32>((_header).size);(_header).bigEndian=false;}}
 
 
-
 LocalSocketPrivate::LocalSocketPrivate(LocalSocket * q)
 :	QObject(0), m_isOpen(false), m_openMode(QIODevice::ReadWrite), m_hasError(false), m_readBufferSize(0), m_remainingReadBytes(Header_size), m_writeBufferSize(0), m_writeBufferSizeNet(0),
-m_lastWrittenType(LAST_WRITTEN_NONE), m_currentWritePackagePosition(0)
+m_lastWrittenType(LAST_WRITTEN_NONE), m_currentWritePackagePosition(0),
+m_maxWriteDataBufferSize(DEF_MAX_WRITE_DATA_BUF_SIZE), m_maxWritePkgBufferSize(DEF_MAX_WRITE_PKG_BUF_SIZE)
 {
 	setWriteBufferSize(8192);
 }
@@ -102,6 +108,7 @@ void LocalSocketPrivate::addToWriteBuffer(const char *data, int size)
 void LocalSocketPrivate::addToPackageWriteBuffer(const QByteArray& package)
 {
 	m_writePkgBuffer.enqueue(package);
+	m_writePkgBufferSize.fetchAndAddOrdered(package.size());
 }
 
 
@@ -130,6 +137,36 @@ void LocalSocketPrivate::setReadBufferSize(qint64 size)
 qint64 LocalSocketPrivate::writeBufferSize() const
 {
 	return m_writeDataBuffer.size();
+}
+
+
+qint64 LocalSocketPrivate::writePkgBufferSize() const
+{
+	return m_writePkgBufferSize;
+}
+
+
+qint64 LocalSocketPrivate::maxWriteDataBufferSize() const
+{
+	return m_maxWriteDataBufferSize;
+}
+
+
+void LocalSocketPrivate::setMaxWriteDataBufferSize(qint64 size)
+{
+	m_maxWriteDataBufferSize = size;
+}
+
+
+qint64 LocalSocketPrivate::maxWritePkgBufferSize() const
+{
+	return m_maxWritePkgBufferSize;
+}
+
+
+void LocalSocketPrivate::setMaxWritePkgBufferSize(qint64 size)
+{
+	m_maxWritePkgBufferSize = size;
 }
 
 
@@ -609,6 +646,7 @@ bool LocalSocketPrivate::writePackageData()
 			return false;
 		
 		m_currentWritePackage					=	m_writePkgBuffer.dequeue();
+		m_writePkgBufferSize.fetchAndAddOrdered(-m_currentWritePackage.size());
 		m_currentWritePackagePosition	=	0;
 	}
 	else

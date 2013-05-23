@@ -242,8 +242,46 @@ void LocalSocket::setReadBufferSize(qint64 size)
 	
 	if(d_ptr->lsPrivate)
 		d_ptr->lsPrivate->setReadBufferSize(size);
+}
+
+
+qint64 LocalSocket::writeBufferSize() const
+{
+	QReadLocker			lsPrivateLocker(&d_ptr->lsPrivateLock);
 	
-	d_ptr->lsPrivate->setReadBufferSize(size);
+	if(d_ptr->lsPrivate)
+		return d_ptr->lsPrivate->maxWriteDataBufferSize();
+	else
+		return d_ptr->readBufferSize;
+}
+
+
+void LocalSocket::setWriteBufferSize(qint64 size)
+{
+	QReadLocker			lsPrivateLocker(&d_ptr->lsPrivateLock);
+	
+	if(d_ptr->lsPrivate)
+		d_ptr->lsPrivate->setMaxWriteDataBufferSize(size);
+}
+
+
+qint64 LocalSocket::writePkgBufferSize() const
+{
+	QReadLocker			lsPrivateLocker(&d_ptr->lsPrivateLock);
+	
+	if(d_ptr->lsPrivate)
+		return d_ptr->lsPrivate->maxWritePkgBufferSize();
+	else
+		return d_ptr->readBufferSize;
+}
+
+
+void LocalSocket::setWritePkgBufferSize(qint64 size)
+{
+	QReadLocker			lsPrivateLocker(&d_ptr->lsPrivateLock);
+	
+	if(d_ptr->lsPrivate)
+		d_ptr->lsPrivate->setMaxWritePkgBufferSize(size);
 }
 
 
@@ -439,6 +477,14 @@ bool LocalSocket::writePackage(const QByteArray& package)
 	if(!d_ptr->lsPrivate)
 		return false;
 	
+	// Only write package if no write pkg buffer size is set
+	// or if the package can fit into the buffer
+	// or if the package buffer is empty (so we can at least write one package at a time)
+	if(d_ptr->lsPrivate->maxWritePkgBufferSize() > 0
+		&& d_ptr->lsPrivate->writePkgBufferSize() > 0
+		&& d_ptr->lsPrivate->maxWritePkgBufferSize() - d_ptr->lsPrivate->writePkgBufferSize() < package.size())
+		return false;
+
 	d_ptr->lsPrivate->addToPackageWriteBuffer(package);
 	
 	// postEvent takes responsability for deletion of the event
@@ -488,6 +534,13 @@ qint64 LocalSocket::writeData(const char *data, qint64 len)
 	// We can only pass INT -> Check size
 	if(len > INT_MAX)
 		len	=	INT_MAX;
+	
+	// Check max size of write buffer
+	if(d_ptr->lsPrivate->maxWriteDataBufferSize() > 0)
+		len = qMin(len, d_ptr->lsPrivate->maxWriteDataBufferSize() - d_ptr->lsPrivate->writeBufferSize());
+	
+	if(len < 1)
+		return 0;
 	
 	d_ptr->lsPrivate->addToWriteBuffer(data, (int)len);
 	
