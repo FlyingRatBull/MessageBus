@@ -39,6 +39,8 @@ class MessageBus : public QObject
 		
 		bool connectToServer(const QString& filename);
 		
+		void disconnectFromServer();
+		
 		bool listen(const QString& filename);
 		
 		bool isOpen() const;

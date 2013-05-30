@@ -70,6 +70,15 @@ bool MessageBus::connectToServer(const QString& filename)
 }
 
 
+void MessageBus::disconnectFromServer()
+{
+	if(!m_peerSocket)
+		return;
+	
+	m_peerSocket->disconnectFromServer();
+}
+
+
 bool MessageBus::listen(const QString& filename)
 {
 	if(m_peerSocket || m_server)
