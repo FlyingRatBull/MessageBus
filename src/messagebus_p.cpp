@@ -53,7 +53,7 @@ QByteArray writeVariant(const Variant& var)
 }
 
 
-Variant readVariant(const QByteArray &data, quint32 &pos)
+Variant readVariant(const QByteArray &data, int &pos)
 {
 	if(data.size() < pos + sizeof(qint32) + sizeof(int))
 	{

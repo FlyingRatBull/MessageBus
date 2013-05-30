@@ -24,7 +24,6 @@ set(HEADERS
 	# Actual headers of tested classes
 	../../localserver.h
 	../../localsocket.h
-	../../localsocketprivate_thread.h
 	../../localsocketprivate.h
 	../../implementations/localsocketprivate_unix.h
 	# 	../tools.h
@@ -56,7 +55,6 @@ set(HEADERS
 
 	# Actual headers of tested classes
 	../../localsocket.h
-	../../localsocketprivate_thread.h
 	../../localsocketprivate.h
 	../../implementations/localsocketprivate_unix.h
 	# 	../tools.h

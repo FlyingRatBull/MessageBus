@@ -32,7 +32,7 @@
 	#define TsDataQueue_Mutex						QMutex
 	#define TsDataQueue_ByteArray				QByteArray
 	#define TsDataQueue_AtomicInt				QAtomicInt
-	#define TsDataQuzeue_WaitCondition	QWaitCondition
+	#define TsDataQueue_WaitCondition		QWaitCondition
 	
 	#define	MIN(a,b) qMin(a,b)
 #else
@@ -522,8 +522,8 @@ class TsDataQueue
 	private:
 		mutable TsDataQueue_Mutex			m_enqueueLocker;
 		mutable TsDataQueue_Mutex			m_dequeueLocker;
-		TsDataQuzeue_WaitCondition		m_nonEmpty;
-		TsDataQuzeue_WaitCondition		m_empty;
+		TsDataQueue_WaitCondition		m_nonEmpty;
+		TsDataQueue_WaitCondition		m_empty;
 		
 		// Size of each part
 		uint													m_partSize;

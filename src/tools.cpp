@@ -27,15 +27,115 @@
 
 #include "global.h"
 
+#include <qvarlengtharray.h>
+
 
 MSGBUS_LOCAL	const char *	HTTP_NUMBERS	=	"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const QString	HTTP_NUMBERS_QS ( HTTP_NUMBERS );
 
+bool invokeMethod(QObject *obj,
+                           const char *member,
+                           Qt::ConnectionType type,
+                           QGenericReturnArgument ret,
+                           QGenericArgument val0 = QGenericArgument(),
+                           QGenericArgument val1 = QGenericArgument(),
+                           QGenericArgument val2 = QGenericArgument(),
+                           QGenericArgument val3 = QGenericArgument(),
+                           QGenericArgument val4 = QGenericArgument(),
+                           QGenericArgument val5 = QGenericArgument(),
+                           QGenericArgument val6 = QGenericArgument(),
+                           QGenericArgument val7 = QGenericArgument(),
+                           QGenericArgument val8 = QGenericArgument(),
+                           QGenericArgument val9 = QGenericArgument())
+	
+{
+	
+if (!obj)
+	
+    return false;
+	
+	
+QVarLengthArray<char, 512> sig;
+	
+int len = qstrlen(member);
+	
+if (len <= 0)
+	
+    return false;
+	
+sig.append(member, len);
+	
+sig.append('(');
+	
+	
+const char *typeNames[] = {ret.name(), val0.name(), val1.name(), val2.name(), val3.name(),
+	
+                           val4.name(), val5.name(), val6.name(), val7.name(), val8.name(),
+	
+                           val9.name()};
+	
+	
+int paramCount;
+	
+for (paramCount = 1; paramCount < 10; ++paramCount) {
+	
+    len = qstrlen(typeNames[paramCount]);
+	
+    if (len <= 0)
+	
+        break;
+	
+    sig.append(typeNames[paramCount], len);
+	
+    sig.append(',');
+	
+}
+	
+if (paramCount == 1)
+	
+    sig.append(')'); // no parameters
+	
+else
+	
+    sig[sig.size() - 1] = ')';
+	
+sig.append('\0');
+	
+	
+int idx = obj->metaObject()->indexOfMethod(sig.constData());
+	
+if (idx < 0) {
+	
+    QByteArray norm = QMetaObject::normalizedSignature(sig.constData());
+	
+    idx = obj->metaObject()->indexOfMethod(norm.constData());
+	
+}
+	
+	
+if (idx < 0 || idx >= obj->metaObject()->methodCount()) {
+	
+    qWarning("QMetaObject::invokeMethod: No such method %s::%s",
+	
+             obj->metaObject()->className(), sig.constData());
+	
+    return false;
+	
+}
+	
+QMetaMethod method = obj->metaObject()->method(idx);
+	
+return method.invoke(obj, type, ret,
+	
+                     val0, val1, val2, val3, val4, val5, val6, val7, val8, val9);
+	
+}
 
-bool callSlot ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5, Qt::ConnectionType type )
+
+bool callSlot ( QObject * object, const char * slot, QGenericReturnArgument ret, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5, Qt::ConnectionType type )
 {
 	const	int	slotLength	=	strlen(slot);
-	char		*	method			= (char*)malloc(slotLength + 1);
+	char		*	method			=	(char*)malloc(slotLength + 1);
 	int				length			=	0;
 	
 	while(slot[length] >= '0' && slot[length] <= '9')
@@ -58,7 +158,8 @@ bool callSlot ( QObject * object, const char * slot, QGenericArgument arg1, QGen
 	// We got the end of the slot name => put EOF
 	method[length]	=	'\0';
 
-	if ( !QMetaObject::invokeMethod ( object, method, type, arg1, arg2, arg3, arg4, arg5 ) )
+// 	if(!QMetaObject::invokeMethod(object, method, type, ret, arg1, arg2, arg3, arg4, arg5))
+	if(!invokeMethod(object, method, type, ret, arg1, arg2, arg3, arg4, arg5))
 	{
 		QMetaMethod	met ( object->metaObject()->method(object->metaObject()->indexOfSlot ( QMetaObject::normalizedSignature(slot + 1) ) ));
 
@@ -100,25 +201,31 @@ bool callSlot ( QObject * object, const char * slot, QGenericArgument arg1, QGen
 
 bool callSlotDirect ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5 )
 {
-	return callSlot ( object, slot, arg1, arg2, arg3, arg4, arg5, Qt::DirectConnection );
+	return callSlot ( object, slot, QGenericReturnArgument(), arg1, arg2, arg3, arg4, arg5, Qt::DirectConnection );
+}
+
+
+bool callSlotDirect ( QObject * object, const char * slot, QGenericReturnArgument ret, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5 )
+{
+	return callSlot ( object, slot, ret, arg1, arg2, arg3, arg4, arg5, Qt::DirectConnection );
 }
 
 
 bool callSlotAuto ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5 )
 {
-	return callSlot ( object, slot, arg1, arg2, arg3, arg4, arg5, Qt::AutoConnection );
+	return callSlot ( object, slot, QGenericReturnArgument(), arg1, arg2, arg3, arg4, arg5, Qt::AutoConnection );
 }
 
 
 bool callSlotQueued ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5 )
 {
-	return callSlot ( object, slot, arg1, arg2, arg3, arg4, arg5, Qt::QueuedConnection );
+	return callSlot ( object, slot, QGenericReturnArgument(), arg1, arg2, arg3, arg4, arg5, Qt::QueuedConnection );
 }
 
 
 bool callSlotBlockingQueued ( QObject * object, const char * slot, QGenericArgument arg1, QGenericArgument arg2, QGenericArgument arg3, QGenericArgument arg4, QGenericArgument arg5 )
 {
-	return callSlot ( object, slot, arg1, arg2, arg3, arg4, arg5, Qt::BlockingQueuedConnection );
+	return callSlot ( object, slot, QGenericReturnArgument(), arg1, arg2, arg3, arg4, arg5, Qt::BlockingQueuedConnection );
 }
 
 

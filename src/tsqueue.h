@@ -24,10 +24,15 @@
 #if QT_VERSION >= 0x040000
 	#include <qglobal.h>
 	#include <QMutex>
-	#define TsQueue_Mutex		QMutex
+	#include <QWaitCondition>
+	
+	#define TsQueue_Mutex					QMutex
+	#define TsQueue_WaitCondition	QWaitCondition
+
 	#define	ASSERT					Q_ASSERT
 #else
 	#error No mutex class found!
+	#error No wait condition class found!
 #endif
 
 template <class T>
@@ -199,6 +204,8 @@ class TsQueue
 			m_tail->next	=	i;
 			m_tail				=	i;
 			
+			m_nonEmpty.wakeAll();
+			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
 				m_locker.unlock();
@@ -240,6 +247,9 @@ class TsQueue
 				}
 			}
 			
+			if(isEmpty())
+				m_empty.wakeAll();
+			
 #ifdef UNIT_TEST
 			if(m_useGlobalLock)
 				m_locker.unlock();
@@ -251,9 +261,55 @@ class TsQueue
 		}
 		
 		
+		bool waitForNonEmpty(uint timeout)
+		{
+			m_enqueueLocker.lock();
+			
+			if(!isEmpty())
+			{
+				m_enqueueLocker.unlock();
+				return true;
+			}
+			
+			m_nonEmpty.wait(&m_enqueueLocker, timeout);
+			m_enqueueLocker.unlock();
+			
+			return !isEmpty();
+		}
+		
+		
+		void abortWaitForNonEmpty()
+		{
+			m_enqueueLocker.lock();
+			
+			m_nonEmpty.wakeAll();
+			
+			m_enqueueLocker.unlock();
+		}
+		
+		
+		bool waitForEmpty(uint timeout)
+		{
+			m_dequeueLocker.lock();
+			
+			if(isEmpty())
+			{
+				m_dequeueLocker.unlock();
+				return true;
+			}
+			
+			m_empty.wait(&m_dequeueLocker, timeout);
+			m_dequeueLocker.unlock();
+			
+			return isEmpty();
+		}
+		
+		
 	private:
-		mutable TsQueue_Mutex			m_enqueueLocker;
-		mutable TsQueue_Mutex			m_dequeueLocker;
+		mutable TsQueue_Mutex		m_enqueueLocker;
+		mutable TsQueue_Mutex		m_dequeueLocker;
+		TsQueue_WaitCondition		m_nonEmpty;
+		TsQueue_WaitCondition		m_empty;
 		
 #ifdef UNIT_TEST
 		mutable TsQueue_Mutex			m_locker;

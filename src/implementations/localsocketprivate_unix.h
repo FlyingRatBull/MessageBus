@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef LOCALSOCKETPRIVATE_UNIX_H
 #define LOCALSOCKETPRIVATE_UNIX_H
 
@@ -25,65 +24,59 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-
-class MSGBUS_LOCAL LocalSocketPrivate_Unix : public LocalSocketPrivate
+class LocalSocketPrivate_Unix : public LocalSocketPrivate
 {
-	Q_OBJECT
-	
 	public:
-		LocalSocketPrivate_Unix(LocalSocket *q);
+		LocalSocketPrivate_Unix(LocalSocket * q);
 		
-		virtual ~LocalSocketPrivate_Unix();
+    virtual ~LocalSocketPrivate_Unix();
 		
-		virtual quintptr socketDescriptor() const;
+		/*
+		 * Implementation
+		 */
+		// Connect to a local server
+		virtual bool connectToServer(const QString& filename);
+		
+		// Set socket descriptor to use for communication
+		virtual bool setSocketDescriptor(quintptr socketDescriptor);
 		
 	protected:
-		virtual bool writeSocketDescriptor(quintptr socketDescriptor);
-		
-		/**
-		 * @brief Notification from LocalSocketPrivate that an socket descriptor is arriving on the socket.
-		 *
-		 * @return void
-		 **/
-		virtual void notifyReadSocketDescriptor();
-		
-		virtual quint32 writeData(const char *data, quint32 size);
-		
-		virtual void flush();
-		
+		/*
+		 * Implementation
+		 */
+		// Close the connection
 		virtual void close();
 		
-		virtual void open(const QString &name, QIODevice::OpenMode mode);
+		// Currently available space in write buffer
+		// Taken for sizing data for write() calls
+		virtual int availableWriteBufferSpace() const;
 		
-		virtual void open(quintptr socketDescriptor, bool socketOpen, QIODevice::OpenMode mode);
+		// Size of the read buffer
+		// Taken for sizing data for read() calls
+		virtual int readBufferSize() const;
 		
-		///@todo setReadBufferSize should be implemented here
+		// Write data to the socket
+		// size must be greater than 0
+		virtual int write(const char * data, int size, quintptr * fileDescriptor);
 		
-	private slots:
-		void readData();
+		// Read data from the socket
+		virtual int read(char * data, int size);
 		
-		/**
-		 * @brief Actual reading of an arriving socket descriptor.
-		 *
-		 * @return void
-		 **/
-		bool readSocketDescriptor();
+		// Wait for reading or writing data
+		virtual bool waitForReadOrWrite(bool& readyRead, bool& readyWrite, int timeout);
 		
 	private:
-		int				m_socket;
+		int							m_readBufferSize;
+		fd_set					m_readFds;
+		fd_set					m_writeFds;
+		fd_set					m_excFds;
+		struct timeval	m_timeout;
 		
-		// Read notifier
-		QSocketNotifier			*	m_readNotifier;
+		struct	msghdr	m_msgHeader;
+		struct	iovec		m_iovecData;
 		
-		// Read buffer
-		QByteArray						m_readBuffer;
-		
-		/// Do we need to read an socket descriptor instead of normal data?
-		bool									m_doReadSocketDescriptor;
-		// Socket receiving
-		struct	msghdr				m_recMsg;
-		struct	iovec					m_recIov;
-		struct	cmsghdr			*	m_recCmsg;
+		char					*	m_ccmsg;
+		int							m_ccmsgSize;
 };
 
 #endif // LOCALSOCKETPRIVATE_UNIX_H

@@ -41,10 +41,10 @@ LocalServer::~LocalServer()
 }
 
 
-bool LocalServer::listen(const QString& identifier)
+bool LocalServer::listen(const QString& filename)
 {
-	QDir		tmpDir(QDir::temp());
-	QString	filename(tmpDir.absoluteFilePath("LocalSocket_" + QString::fromAscii(QCryptographicHash::hash(identifier.toUtf8(), QCryptographicHash::Sha1).toHex()) + ".sock"));
+// 	QDir		tmpDir(QDir::temp());
+// 	QString	filename(tmpDir.absoluteFilePath("LocalSocket_" + QString::fromAscii(QCryptographicHash::hash(filename.toUtf8(), QCryptographicHash::Sha1).toHex()) + ".sock"));
 
 	QLocalServer::removeServer(filename);
 	bool	ret	=	QLocalServer::listen(filename);
@@ -57,7 +57,7 @@ bool LocalServer::listen(const QString& identifier)
 																	QFile::ReadOwner | QFile::ReadGroup | /*QFile::ReadOther |*/
 																	QFile::WriteOwner | QFile::WriteGroup/* | QFile::WriteOther*/);
 		
-		m_id				=	identifier;
+		m_id				=	filename;
 		m_filename	=	filename;
 	}
 	else

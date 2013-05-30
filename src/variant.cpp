@@ -22,96 +22,96 @@
 #include <QString>
 
 Variant::Variant()
-: m_type(None)
+: m_type(None), m_optId(0)
 {
 }
 
 
 Variant::Variant(Variant::Type type)
-: m_type(type)
+: m_type(type), m_optId(0)
 {
 
 }
 
 
 Variant::Variant(qint8 num)
-: m_type(Int8)
+: m_type(Int8), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint8 num)
-: m_type(UInt8)
+: m_type(UInt8), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint16 num)
-: m_type(Int16)
+: m_type(Int16), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint16 num)
-: m_type(UInt16)
+: m_type(UInt16), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint32 num)
-: m_type(Int32)
+: m_type(Int32), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint32 num)
-: m_type(UInt32)
+: m_type(UInt32), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint64 num)
-: m_type(Int64)
+: m_type(Int64), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint64 num)
-: m_type(UInt64)
+: m_type(UInt64), m_optId(0)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(const QString& string)
-: m_type(String)
+: m_type(String), m_optId(0)
 {
 	setValue(string);
 }
 
 
 Variant::Variant(bool boolean)
-: m_type(Bool)
+: m_type(Bool), m_optId(0)
 {
 	setValue(boolean);
 }
 
 
 Variant::Variant(const QByteArray& data)
-: m_type(ByteArray), m_data(data)
+: m_type(ByteArray), m_data(data), m_optId(0)
 {
 }
 
 
-Variant::Variant(const QByteArray& data, Variant::Type type)
-: m_type(type), m_data(data)
+Variant::Variant(const QByteArray &data, Variant::Type type, quint32 optId)
+: m_type(type), m_data(data), m_optId(optId)
 {
 }
 
@@ -123,7 +123,7 @@ Variant::Variant(const Variant& other)
 
 
 Variant::Variant(const QVariant& other)
-: m_type(None)
+: m_type(None), m_optId(0)
 {
 	(*this)	=	other;
 }
@@ -139,6 +139,7 @@ Variant& Variant::operator = (const Variant& other)
 {
 	m_data	=	other.m_data;
 	m_type	=	other.m_type;
+	m_optId	=	other.m_optId;
 	return *this;
 }
 
@@ -383,6 +384,18 @@ Variant& Variant::operator = (qint64 num)
 }
 
 
+void Variant::setOptionalId(quint32 optId)
+{
+	m_optId	=	optId;
+}
+
+
+quint32 Variant::optionalId() const
+{
+	return m_optId;
+}
+
+
 void Variant::setValue(qint8 num)
 {
 	m_data	=	QByteArray((char*)&num, sizeof(qint8));
@@ -618,55 +631,60 @@ QString Variant::toString(bool * ok) const
 	///@todo Complete switch
 	switch(m_type)
 	{
+		case ByteArray:
+		{
+			return m_data.toHex();
+		};
+		
 		case String:
 		{
 			return QString::fromUtf8(m_data);
 		}break;
 
-    case Int8:
-    {
-      return QString::number(toInt8());
-    }break;
+		case Int8:
+		{
+			return QString::number(toInt8());
+		}break;
 
-    case Int16:
-    {
-      return QString::number(toInt16());
-    }break;
+		case Int16:
+		{
+			return QString::number(toInt16());
+		}break;
 
-    case Int32:
-    {
-      return QString::number(toInt32());
-    }break;
+		case Int32:
+		{
+			return QString::number(toInt32());
+		}break;
 
-    case Int64:
-    {
-      return QString::number(toInt64());
-    }break;
+		case Int64:
+		{
+			return QString::number(toInt64());
+		}break;
 
-    case UInt8:
-    {
-      return QString::number(toUInt8());
-    }break;
+		case UInt8:
+		{
+			return QString::number(toUInt8());
+		}break;
 
-    case UInt16:
-    {
-      return QString::number(toUInt16());
-    }break;
+		case UInt16:
+		{
+			return QString::number(toUInt16());
+		}break;
 
-    case UInt32:
-    {
-      return QString::number(toUInt32());
-    }break;
+		case UInt32:
+		{
+			return QString::number(toUInt32());
+		}break;
 
-    case UInt64:
-    {
-      return QString::number(toUInt64());
-    }break;
+		case UInt64:
+		{
+			return QString::number(toUInt64());
+		}break;
 		
 		case SocketDescriptor:
-    {
-      return QString::number(toSocketDescriptor());
-    }break;
+		{
+			return QString::number(toSocketDescriptor());
+		}break;
 		
 		case Bool:
 		{
@@ -803,13 +821,25 @@ Variant Variant::fromByteArray(const QByteArray &data)
 
 bool Variant::operator == (const Variant& other) const
 {
-  return (m_type == other.m_type && m_data == other.m_data);
+  return (m_type == other.m_type && m_data == other.m_data && m_optId == other.m_optId);
+}
+
+
+bool Variant::operator != (const Variant& other) const
+{
+  return !(*this == other);
 }
 
 
 bool Variant::isValid() const
 {
 	return (m_type != None);
+}
+
+
+int Variant::size() const
+{
+	return m_data.size();
 }
 
 

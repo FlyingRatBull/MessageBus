@@ -39,6 +39,7 @@
 		* @param arg5 Argument 5.
 		*/
 bool callSlotDirect ( QObject * object, const char * slot, QGenericArgument arg1 = QGenericArgument ( 0 ), QGenericArgument arg2 = QGenericArgument ( 0 ), QGenericArgument arg3 = QGenericArgument ( 0 ), QGenericArgument arg4 = QGenericArgument ( 0 ), QGenericArgument arg5 = QGenericArgument ( 0 ) );
+bool callSlotDirect ( QObject * object, const char * slot, QGenericReturnArgument ret, QGenericArgument arg1 = QGenericArgument ( 0 ), QGenericArgument arg2 = QGenericArgument ( 0 ), QGenericArgument arg3 = QGenericArgument ( 0 ), QGenericArgument arg4 = QGenericArgument ( 0 ), QGenericArgument arg5 = QGenericArgument ( 0 ) );
 
 
 /**

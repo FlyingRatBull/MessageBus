@@ -23,6 +23,7 @@
 #include <QString>
 
 #include "localsocket.h"
+#include "global.h"
 
 
 enum MSGBUS_LOCAL Command
@@ -42,7 +43,7 @@ QString MSGBUS_LOCAL	socketName(const QString& service, const QString& object);
 
 QByteArray MSGBUS_LOCAL	writeVariant(const Variant& var);
 
-Variant MSGBUS_LOCAL	readVariant(const QByteArray& data, quint32& pos);
+Variant MSGBUS_LOCAL	readVariant(const QByteArray& data, int& pos);
 
 
 #endif // MSGBUS_P_H

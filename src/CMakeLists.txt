@@ -8,9 +8,8 @@ set(SOURCES
 	localsocket.cpp
 	localsocketprivate.cpp
 	
-	messagebus.cpp
+ 	messagebus.cpp
 	messagebus_p.cpp
-	messagebusinterface.cpp
 	
 	tools.cpp
 	variant.cpp
@@ -20,12 +19,9 @@ set(HEADERS
 	localserver.h
 	localsocket.h
 	localsocketprivate.h
-	localsocketprivate_thread.h
 
-	messagebus.h
+ 	messagebus.h
 # 	messagebus_p.h
-	messagebusinterface.h
-	messagebusinterface_p.h
 	
 # 	tools.h
 # 	tsdataqueue.h

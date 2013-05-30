@@ -35,7 +35,7 @@ class LocalServer : public QLocalServer
 		
 		virtual ~LocalServer();
 
-		bool listen(const QString& identifier);
+		bool listen(const QString& filename);
 		
 	signals:
 		void newConnection(quintptr socketDescriptor);

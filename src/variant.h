@@ -104,7 +104,7 @@ class Variant
 			
 			@warning Use with caution as the data is not checked!
 		*/
-		Variant(const QByteArray& data, Variant::Type type);
+		Variant(const QByteArray& data, Variant::Type type, quint32 optId = 0);
 		
 		Variant(const QString& string);
 		
@@ -144,7 +144,15 @@ class Variant
 
     bool operator == (const Variant& other) const;
 		
+		bool operator != (const Variant& other) const;
+		
 		bool isValid() const;
+		
+		int size() const;
+		
+		void setOptionalId(quint32 optId);
+		
+		quint32 optionalId() const;
 		
 		void setValue(qint8 num);
 		
@@ -225,6 +233,7 @@ class Variant
 	private:
 		Type							m_type;
 		QByteArray				m_data;
+		quint32						m_optId;
 };
 
 Q_DECLARE_METATYPE(Variant)
