@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,227 +19,154 @@
 #ifndef LOCALSOCKETPRIVATE_H
 #define LOCALSOCKETPRIVATE_H
 
-#include <QtCore/QString>
-#include <QtCore/QIODevice>
-#include <QtCore/QEvent>
-
 #include "localsocket.h"
 
-#include "variant.h"
-#include "tsqueue.h"
-#include "tsdataqueue.h"
-#include "tools.h"
+#include <QObject>
+#include <QList>
+#include <QElapsedTimer>
+#include <QSocketNotifier>
 
-class MSGBUS_LOCAL LocalSocketPrivateEvent : public QEvent
-{
-	public:
-		static QEvent::Type LocalSocketPrivateType;
-		
-		enum Type
-		{
-			Connect,
-			Disconnect,
-			Flush,
-			WriteData,
-			WritePackage,
-			WriteSocketDescriptor
-		};
-		
-		LocalSocketPrivateEvent(Type type)
-		: QEvent(LocalSocketPrivateType), socketEventType(type), socketDescriptorOpen(false)
-		{
-		}
-		
-		Type			socketEventType;
-		
-		// For connect
-		Variant								connectTarget;
-		QIODevice::OpenMode		connectMode;
-		bool									socketDescriptorOpen;
-};
-
-
-class MSGBUS_LOCAL LocalSocketPrivate : public QObject
+class LocalSocketPrivate : public QObject
 {
 	Q_OBJECT
-
+	
 	public:
-		TsDataQueue							m_readBuffer;
-		TsQueue<QByteArray>			m_readPkgBuffer;
-		TsQueue<int>						m_readSDescBuffer;
-		
-		
 		LocalSocketPrivate(LocalSocket * q);
 		
 		virtual ~LocalSocketPrivate();
 		
-		void addToWriteBuffer(const char * data, int size);
+		bool waitForReadyRead(QElapsedTimer& timer, int timeout = 30000);
 		
-		void addToPackageWriteBuffer(const QByteArray &package);
+		bool waitForDataWritten(QElapsedTimer& timer, int timeout = 30000);
+
+		void disconnectFromServer();
 		
-		void addToWriteBuffer(quintptr socketDescriptor);
+		void notifyWrite();
 		
-		qint64 readBufferSize() const;
-		
-		void setReadBufferSize(qint64 size);
-		
-		qint64 writeBufferSize() const;
-		
-		qint64 writePkgBufferSize() const;
-		
-		qint64 maxWriteDataBufferSize() const;
-		
-		void setMaxWriteDataBufferSize(qint64 size);
-		
-		qint64 maxWritePkgBufferSize() const;
-		
-		void setMaxWritePkgBufferSize(qint64 size);
-		
-		qint64 writePackageBufferSize() const;
-		
-		qint64 writeSocketDescriptorBufferSize() const;
-		
-		bool canReadLine() const;
-		
-		QIODevice::OpenMode openMode() const;
-		
-		bool hasError() const;
+		void flush();
 		
 		/*
-		 * The following functions must be implemented by subclasses
+		 * Implementation
 		 */
-		virtual quintptr socketDescriptor() const = 0;
+		// Connect to a local server
+		virtual bool connectToServer(const QString& filename) = 0;
 		
-	signals:
-		void connected();
+		// Set socket descriptor to use for communication
+		virtual bool setSocketDescriptor(quintptr socketDescriptor) = 0;
 		
-		void disconnected();
-		
-		void readyRead();
-		
-		void readyReadPackage();
-		
-		void readyReadSocketDescriptor();
-		
-		void bytesWritten(qint64 bytes);
-		
-		void packageWritten();
-		
-		void socketDescriptorWritten(quintptr socketDescriptor);
-		
-		void error(LocalSocket::LocalSocketError socketError, const QString& errorText);
+		/*
+		 * Control variables
+		 */
+		// Connected?
+		bool				m_isOpen;
+		// Socket descriptor
+		quintptr		m_socketDescriptor;
+		// Last error
+		QString			m_errorString;
+
+		/*
+		 * Data variables
+		 */
+		// Output buffer
+		QList<Variant>		m_writeBuffer;
+		// Input buffer
+		QList<Variant>		m_readBuffer;
+		// Currently writing data (including Variant type and id)
+		QByteArray				m_currentWriteData;
 		
 	protected:
-		bool event(QEvent * event);
+		void enableReadNotifier();
 		
-		void setWriteBufferSize(quint32 size);
+		void disableReadNotifier();
 		
-		void addReadData(const char *src, int size);
+		void removeReadNotifier();
 		
-		void addReadSocketDescriptor(quintptr socketDescriptor, quintptr peerSocketDescriptor);
+		void enableWriteNotifier();
+		
+		void disableWriteNotifier();
+		
+		void removeWriteNotifier();
+		
+		void enableExceptionNotifier();
+		
+		void disableExceptionNotifier();
+		
+		void removeExceptionNotifier();
 		
 		void setOpened();
 		
 		void setClosed();
 		
-		bool isOpen() const;
+		void setError(const QString& errorString);
 		
-		void setError(LocalSocket::LocalSocketError socketError, const QString& errorText);
-		
-		quint32 remainingReadBytes() const;
+		void addReadFileDescriptor(quintptr fileDescriptor);
 		
 		/*
-		 * The following functions must be implemented by subclasses
+		 * Implementation
 		 */
-		virtual void open(quintptr socketDescriptor, bool socketOpen, QIODevice::OpenMode mode) = 0;
-		
-		virtual void open(const QString& name, QIODevice::OpenMode mode) = 0;
-		
+		// Close the connection
 		virtual void close() = 0;
 		
-		/**
-		 * @brief Writes data to the underlying socket.
-		 * 
-		 * @note This function may not block if it chooses to.
-		 *
-		 * @param data Pointer to data to write.
-		 * @param size Size of data.
-		 * @return Number of actually written bytes.
-		 **/
-		virtual quint32 writeData(const char * data, quint32 size) = 0;
+		// Currently available space in write buffer
+		// Taken for sizing data for write() calls
+		virtual int availableWriteBufferSpace() const
+		{
+			return 8192;
+		}
 		
-		/**
-		 * @brief Writes an socket descriptor to the underlying socket.
-		 * 
-		 * @note This function may either write the whole socket descriptor or nothing of it.
-		 *
-		 * @param socketDescriptor Socket descriptor to write.
-		 * @return TRUE on success; FALSE otherweise.
-		 **/
-		virtual bool writeSocketDescriptor(quintptr socketDescriptor) = 0;
+		// Size of the read buffer
+		// Taken for sizing data for read() calls
+		virtual int readBufferSize() const
+		{
+			return 8192;
+		}
+		
+		// Write data to the socket
+		// size must be greater than 0
+		virtual int write(const char * data, int size, quintptr * fileDescriptor) = 0;
+		
+		// Read data from the socket
+		virtual int read(char * data, int size) = 0;
+		
+		// Wait for reading or writing data
+		virtual bool waitForReadOrWrite(bool& readyRead, bool& readyWrite, int timeout) = 0;
+		
+	private slots:
+		void readData();
+		
+		void writeData();
+		
+		void exception();
+		
+	private:
+		// Check temporary read data and associate received file descritpors to Variants
+		void checkTempReadData(bool required = false);
+		
+	private:
+		LocalSocket				*	m_q;
+		
+		QSocketNotifier		*	m_readNotifier;
+		QSocketNotifier		*	m_writeNotifier;
+		QSocketNotifier		*	m_exceptionNotifier;
 		
 		/*
-		 * The following functions are for convenience and need not to be implemented
+		 * Data variables
 		 */
-		virtual void notifyReadSocketDescriptor() {};
+		// Position into currently writing data
+		int								m_currentWriteDataPos;
+		// File descriptor associated with the data
+		quintptr				*	m_currentlyWritingFileDescriptor;
 		
-		virtual void flush() {};
-		
-	private:
-		bool writeDataRotated();
-		
-		bool writeData();
-		
-		bool writePackageData();
-		
-		bool writeSocketDescriptor();
-		
-	private:
-		struct Header
-		{
-			quint32		cmd;
-			quint32		size;
-			quint16		crc16;
-			bool			bigEndian;
-		};
-		// size of Header must be defined explicitely because the compiler can realign structs
-	#define Header_size	(sizeof(quint32)*2 + sizeof(quint16) + sizeof(bool))
-		
-		bool										m_isOpen;
-		QIODevice::OpenMode			m_openMode;
-		bool										m_hasError;
-		
-		TsDataQueue							m_writeDataBuffer;
-		TsQueue<QByteArray>			m_writePkgBuffer;
-		QAtomicInt							m_writePkgBufferSize;
-		TsQueue<int>						m_writeSDescBuffer;
-		
-		/// Buffer for outgoing data
-		QByteArray							m_writeBuffer;
-		
-		/// Maximum write buffer size
-		qint64									m_maxWriteDataBufferSize;
-		/// Maximum package buffer size
-		qint64									m_maxWritePkgBufferSize;
-		/// Read buffer size
-		qint64									m_readBufferSize;
-		///Temporary read buffer (until one whole data portion is readable)
-		QByteArray							m_tmpReadBuffer;
-		/// Number of bytes to read to get full data portion
-		quint32									m_remainingReadBytes;
-		
-		/// Size of implementation write buffer
-		quint32									m_writeBufferSize;
-		/// Size of implementation write buffer without header
-		quint32									m_writeBufferSizeNet;
-		
-		/// Last written data type (Used for rotational write)
-		uchar										m_lastWrittenType;
-		/// Position into currently being written package
-		uint										m_currentWritePackagePosition;
-		QByteArray							m_currentWritePackage;
-		
-		QByteArray							m_currentReadPackage;
+		// Temporary input buffer (until file descriptors are set correctly in read data)
+		QList<Variant>		m_tempReadBuffer;
+		// Input buffer for file descriptors which are not yet associated to Variants
+		QList<quintptr>		m_tempReadFileDescBuffer;
+		// Currently reading data (whole package)
+		QByteArray				m_currentReadData;
+		// Required size of read data for reading an package
+		quint32						m_currentRequiredReadDataSize;
+		// Currently reading data (one call)
+		QByteArray				m_currentReadDataBuffer;
 };
 
 #endif // LOCALSOCKETPRIVATE_H

@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -18,464 +18,249 @@
 
 #include "localsocketprivate.h"
 
-#include <QtCore/QCoreApplication>
-
-#include "variant.h"
-
-#include "unittests/logger.h"
-
-
-QEvent::Type LocalSocketPrivateEvent::LocalSocketPrivateType	=	QEvent::None;
-
-
-/*
- * Definitions: Last written type
- */
-#define LAST_WRITTEN_NONE		0
-#define LAST_WRITTEN_MIN		1
-
-#define LAST_WRITTEN_DATA		1
-#define LAST_WRITTEN_PKG		2
-#define LAST_WRITTEN_SDESC	3
-
-#define LAST_WRITTEN_MAX		3
-
-/*
- * Definitions: Commands
- */
-#define CMD_DATA			0x10		// Raw data
-#define CMD_PKG				0x11		// Data portion of package
-#define CMD_PKG_END		0x12		// Last data portion of package (completes the package)
-#define CMD_SOCK			0x13		// Socket descriptor
-#define CMD_SOCK_SUC	0x14		// Successfull receival of socket descriptor
-
-#define CMD_MIN			0x10
-#define CMD_MAX			0x14
-///@todo Implement command for informing about the buffer sizes
-
-/*
- * Definitions: Default values
- */
-#define DEF_MAX_WRITE_DATA_BUF_SIZE 262144	// 256kb
-#define DEF_MAX_WRITE_PKG_BUF_SIZE 262144	// 256kb
-
-/*
- * Functions
- */
-#define INIT_HEADER(_header,_size,_cmd,_dataPtr) {(_header).cmd=qToBigEndian<quint32>(_cmd);(_header).size=qToBigEndian<quint32>(_size);(_header).crc16=qChecksum((_dataPtr),(_size));(_header).bigEndian=true;}
-#define CORRECT_HEADER(_header) {if((_header).bigEndian){(_header).cmd=qFromBigEndian<quint32>((_header).cmd);(_header).size=qFromBigEndian<quint32>((_header).size);(_header).bigEndian=false;}}
-
+#define HEADER_SIZE (sizeof(quint8) + sizeof(quint32) + sizeof(quint32))
 
 LocalSocketPrivate::LocalSocketPrivate(LocalSocket * q)
-:	QObject(0), m_isOpen(false), m_openMode(QIODevice::ReadWrite), m_hasError(false), m_readBufferSize(0), m_remainingReadBytes(Header_size), m_writeBufferSize(0), m_writeBufferSizeNet(0),
-m_lastWrittenType(LAST_WRITTEN_NONE), m_currentWritePackagePosition(0),
-m_maxWriteDataBufferSize(DEF_MAX_WRITE_DATA_BUF_SIZE), m_maxWritePkgBufferSize(DEF_MAX_WRITE_PKG_BUF_SIZE)
+	:	QObject(), m_q(q), m_readNotifier(0), m_writeNotifier(0), m_exceptionNotifier(0),
+	m_currentlyWritingFileDescriptor(0), m_currentWriteDataPos(0), m_socketDescriptor(0),
+	m_currentRequiredReadDataSize(0), m_isOpen(false)
 {
-	setWriteBufferSize(8192);
 }
 
 
 LocalSocketPrivate::~LocalSocketPrivate()
 {
-	// close() must not be called from here as the subclass is already destroyed at this point!
+	removeReadNotifier();
+	removeWriteNotifier();
+	
+	if(m_currentlyWritingFileDescriptor)
+		delete m_currentlyWritingFileDescriptor;
 }
 
 
-QIODevice::OpenMode LocalSocketPrivate::openMode() const
+bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 {
-	return m_openMode;
-}
-
-
-bool LocalSocketPrivate::hasError() const
-{
-	return m_hasError;
-}
-
-
-void LocalSocketPrivate::addToWriteBuffer(const char *data, int size)
-{
-// 	qDebug("[0x%08X] addToWriteBuffer()", int(QCoreApplication::instance()));
-
-// 	static quint64	totalWrittenLSPEnqueue	=	0;
-// 	totalWrittenLSPEnqueue	+=	size;
-// 	qDebug("total-written (LSP:enqueue): %llu", totalWrittenLSPEnqueue);
-
-	m_writeDataBuffer.enqueue(data, size);
-}
-
-
-void LocalSocketPrivate::addToPackageWriteBuffer(const QByteArray& package)
-{
-	m_writePkgBuffer.enqueue(package);
-	m_writePkgBufferSize.fetchAndAddOrdered(package.size());
-}
-
-
-void LocalSocketPrivate::addToWriteBuffer(quintptr socketDescriptor)
-{
-	m_writeSDescBuffer.enqueue(socketDescriptor);
-}
-
-
-qint64 LocalSocketPrivate::readBufferSize() const
-{
-	return m_readBufferSize;
-}
-
-
-void LocalSocketPrivate::setReadBufferSize(qint64 size)
-{
-	///@todo Set buffer size of read buffer
-	///@todo Implement equal functionality for packages and socket descriptors
-// 	m_readBufferSize	=	size;
-
-	m_tmpReadBuffer.reserve(size * 2);
-}
-
-
-qint64 LocalSocketPrivate::writeBufferSize() const
-{
-	return m_writeDataBuffer.size();
-}
-
-
-qint64 LocalSocketPrivate::writePkgBufferSize() const
-{
-	return m_writePkgBufferSize;
-}
-
-
-qint64 LocalSocketPrivate::maxWriteDataBufferSize() const
-{
-	return m_maxWriteDataBufferSize;
-}
-
-
-void LocalSocketPrivate::setMaxWriteDataBufferSize(qint64 size)
-{
-	m_maxWriteDataBufferSize = size;
-}
-
-
-qint64 LocalSocketPrivate::maxWritePkgBufferSize() const
-{
-	return m_maxWritePkgBufferSize;
-}
-
-
-void LocalSocketPrivate::setMaxWritePkgBufferSize(qint64 size)
-{
-	m_maxWritePkgBufferSize = size;
-}
-
-
-qint64 LocalSocketPrivate::writePackageBufferSize() const
-{
-	return m_writePkgBuffer.count();
-}
-
-
-qint64 LocalSocketPrivate::writeSocketDescriptorBufferSize() const
-{
-	return m_writeSDescBuffer.count();
-}
-
-
-bool LocalSocketPrivate::canReadLine() const
-{
-	return m_readBuffer.contains('\n');
-}
-
-
-bool LocalSocketPrivate::event(QEvent *event)
-{
-	if(event->type() == LocalSocketPrivateEvent::LocalSocketPrivateType)
+	bool	readyRead		=	false;
+	bool	readyWrite	=	false;
+	
+	disableReadNotifier();
+	disableWriteNotifier();
+	disableExceptionNotifier();
+	
+	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
 	{
-		LocalSocketPrivateEvent		*	ev	=	dynamic_cast<LocalSocketPrivateEvent*>(event);
+		// Do we need to write?
+		readyWrite	=	(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
+		// We need to read
+		readyRead		=	true;
 		
-		if(!ev)
+		bool	ret	=	waitForReadOrWrite(readyRead, readyWrite, (timeout > 0 ? timeout - timer.elapsed() : 0));
+		
+		// Failed to wait
+		if(!ret)
+		{
+			if(m_isOpen)
+			{
+				enableReadNotifier();
+				enableWriteNotifier();
+				enableExceptionNotifier();
+			}
+			
 			return false;
-		
-		switch(ev->socketEventType)
-		{
-			/*
-			 * Sent by:
-			 * 
-			 * connectToServer() / setSocketDescriptor()
-			 */
-			case LocalSocketPrivateEvent::Connect:
-			{
-				m_openMode	=	ev->connectMode;
-				
-				if(ev->connectTarget.type() == Variant::String)
-					open(ev->connectTarget.toString(), ev->connectMode);
-				else if(ev->connectTarget.type() == Variant::SocketDescriptor)
-					open(ev->connectTarget.toSocketDescriptor(), ev->socketDescriptorOpen, ev->connectMode);
-				
-				bool	result	=	false;
-				
-				if(isOpen())
-				{
-					result	=	true;
-					
-					// Write data in buffers
-					if((!m_writeDataBuffer.isEmpty() || !m_writePkgBuffer.isEmpty() || !m_writeSDescBuffer.isEmpty() || !m_currentWritePackage.isEmpty()))
-						QCoreApplication::postEvent(this, new LocalSocketPrivateEvent(LocalSocketPrivateEvent::Flush));
-				}
-				
-				// Here either setError() must have been called or setOpen() for waitForConnected() to work correctly
-				
-				ev->setAccepted(result);
-			}break;
-			
-			/*
-			 * Sent by disconnectFromServer() / abort()
-			 */
-			case LocalSocketPrivateEvent::Disconnect:
-			{
-				close();
-				
-				ev->setAccepted(true);
-			}break;
-			
-			/*
-			 * Sent by disconnectFromServer() / flush()
-			 */
-			case LocalSocketPrivateEvent::Flush:
-			{
-// 				Logger::log("Bytes read (LocalSocketPrivate)", totalReadLS, "F", "Flush");
-				
-				if(!isOpen() || !writeDataRotated())
-					ev->setAccepted(false);
-				else
-					ev->setAccepted(true);
-			}break;
-			
-			case LocalSocketPrivateEvent::WriteSocketDescriptor:
-			case LocalSocketPrivateEvent::WritePackage:
-			case LocalSocketPrivateEvent::WriteData:
-			{
-// 				Logger::log("Bytes read (LocalSocketPrivate)", totalReadLS, "W", "Write");
-				
-				if(!isOpen() || !writeDataRotated())
-					ev->setAccepted(false);
-				else
-					ev->setAccepted(true);
-			}break;
-			
-			default:
-			{
-				ev->setAccepted(false);
-			}break;
 		}
 		
-		// We still have data to send -> send new event
-		if(isOpen() && (!m_writeDataBuffer.isEmpty() || !m_writePkgBuffer.isEmpty() || !m_writeSDescBuffer.isEmpty() || !m_currentWritePackage.isEmpty()))
-			QCoreApplication::postEvent(this, new LocalSocketPrivateEvent(LocalSocketPrivateEvent::Flush));
-
-		// Don't return whether it was handled or not because the system can't handle our custom event anyways
-		return true;
+		// Read and write data if we can
+		if(readyWrite)
+			writeData();
+		if(readyRead)
+			readData();
+		
+		if(readyRead)
+			break;
+		
+		readyRead		=	false;
+		readyWrite	=	false;
 	}
-	else
-		return QObject::event(event);
+	
+	enableReadNotifier();
+	enableWriteNotifier();
+	enableExceptionNotifier();
+	
+	return readyRead;
 }
 
 
-void LocalSocketPrivate::setWriteBufferSize(quint32 size)
+bool LocalSocketPrivate::waitForDataWritten(QElapsedTimer& timer, int timeout)
 {
-	// Minimum: 64 bytes
-	m_writeBufferSize			=	qMax((quint32)64, size);
-	m_writeBufferSizeNet	=	m_writeBufferSize - Header_size;
+	bool	readyRead		=	false;
+	bool	readyWrite	=	false;
 	
-	///@test Test TsDataQueue::setPartSize()
-// 	m_writeDataBuffer.setPartSize(m_writeBufferSize - Header_size);
+	disableReadNotifier();
+	disableWriteNotifier();
+	disableExceptionNotifier();
 	
-	m_writeBuffer.resize(m_writeBufferSize);
+	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
+	{
+		// We need to read and to write
+		readyWrite	=	true;
+		// We need to read
+		readyRead		=	true;
+		
+		bool	ret	=	waitForReadOrWrite(readyRead, readyWrite, (timeout > 0 ? timeout - timer.elapsed() : 0));
+		
+		// Failed to wait
+		if(!ret)
+		{
+			if(m_isOpen)
+			{
+				enableReadNotifier();
+				enableWriteNotifier();
+				enableExceptionNotifier();
+			}
+			
+			return false;
+		}
+		
+		// Read and write data if we can
+		if(readyWrite)
+			writeData();
+		if(readyRead)
+			readData();
+		
+		if(readyWrite)
+			break;
+		
+		readyRead		=	false;
+		readyWrite	=	false;
+	}
+	
+	enableReadNotifier();
+	enableWriteNotifier();
+	enableExceptionNotifier();
+	
+	return readyWrite;
 }
 
 
-void LocalSocketPrivate::addReadData(const char *src, int size)
+void LocalSocketPrivate::disconnectFromServer()
 {
-	// Append data to temporary read data for later analyzation
-// 	qDebug("[%p] addReadData() - m_tmpReadBuffer.size(): %d (+%d)", QCoreApplication::instance(), m_tmpReadBuffer.size(), size);
-	m_tmpReadBuffer.append(src, size);
-// 	qDebug("[%p] ok", QCoreApplication::instance());
-	
-// 	qDebug("[%p] addReadData() - m_tmpReadBuffer.size(): %d", QCoreApplication::instance(), m_tmpReadBuffer.size());
-	
-	QByteArray					readData;
-	QList<QByteArray>		readPackages;
-
-	// Try to read data portions
-	while(!m_tmpReadBuffer.isEmpty())
-	{
-		m_remainingReadBytes	=	Header_size;
-		
-		if(m_tmpReadBuffer.size() < Header_size)
-		{
-			m_remainingReadBytes	=	Header_size - m_tmpReadBuffer.size();
-			break;
-		}
-		
-		// Read header
-		struct Header	*	header	=	(Header*)m_tmpReadBuffer.constData();
-		
-		// Converts from big endian if needed
-		CORRECT_HEADER(*header);
-		
-		// Check command - size can be invalid if command is already invalid
-		if(header->cmd > CMD_MAX || header->cmd < CMD_MIN)
-		{
-			qDebug("Invalid data header!");
-			setError(LocalSocket::SocketResourceError, "Invalid data header!");
-			break;
-		}
-		
-// 		qDebug("header.cmd = 0x%08X", header.cmd);
-		
-		// Check size
-		if(m_tmpReadBuffer.size() < header->size + Header_size)
-		{
-			// Add additional size of header as we almost always want at least an header (Except when an socket descriptor follows)
-			m_remainingReadBytes	=	(header->size + Header_size) - m_tmpReadBuffer.size() + (header->cmd != CMD_SOCK ? Header_size : 0);
-			break;
-		}
-		
-// 		qDebug("header.size = %u", header.size);
-		
-		// Check crc
-		if(header->crc16 != qChecksum(m_tmpReadBuffer.constData() + Header_size, header->size))
-		{
-// 			qDebug("Invalid CRC checksum:\n\theader.crc16 = 0X%04X\n\tcrc15        = 0x%04X", header.crc16, qChecksum(m_tmpReadBuffer.constData() + sizeof(header), header.size));
-			setError(LocalSocket::SocketResourceError, "Invalid CRC checksum!");
-			break;
-		}
-		
-		QByteArray	data(m_tmpReadBuffer.mid(Header_size, header->size));
-		
-		// For debugging
-		
-// 		qDebug("Got data size: %d", data.size());
-// 		static quint64	totalReadLS	=	0;
-// 		totalReadLS	+=	data.size() + sizeof(header);
-// 		qDebug("total-read (ls): %llu", totalReadLS);
-// 		Logger::log("Bytes read (LocalSocketPrivate)", totalReadLS);
-		
-// 		qDebug("??? sizeof(header): %d; header.size: %d; total: %d", Header_size, header->size, Header_size + header->size);
-		
-		switch(header->cmd)
-		{
-			case CMD_DATA:
-			{
-				///@todo Implement max size in TsDataQueue and waitForNonFull() and use them here
-				readData.append(data);
-			}break;
-			
-			case CMD_PKG:
-			{
-				m_currentReadPackage.append(data);
-			}break;
-			
-			case CMD_PKG_END:
-			{
-				m_currentReadPackage.append(data);
-				readPackages.append(m_currentReadPackage);
-				m_currentReadPackage.clear();
-				
-// 				static	int	totalPkgEnd	=	0;
-// 				totalPkgEnd++;
-// 				qDebug("totalPkgEnd: %d", totalPkgEnd);
-			}break;
-			
-			case CMD_SOCK:
-			{
-				// Notify the implementation that an socket descriptor is ready for receival
-				notifyReadSocketDescriptor();
-			}break;
-			
-			case CMD_SOCK_SUC:
-			{
-				// An socket descriptor has successfully been written to the peer
-				quintptr		sdData						=	qFromBigEndian<quintptr>(*((quintptr*)(data.constData())));
-				
-				emit(socketDescriptorWritten(sdData));
-			}break;
-		}
-		
-		// Remove from temporary buffer
-		m_tmpReadBuffer	=	m_tmpReadBuffer.mid(Header_size + header->size);
-	}
-	
-	if(!readData.isEmpty())
-	{
-		// For debugging
-		
-// 		static	quint64	LSPaddRead	=	0;
-// 		LSPaddRead	+=	readData.size();
-// 		Logger::log("Read buffer size (LocalSocketPrivate)", m_readBuffer.size());
-// 		Logger::log("Total Bytes added for reading (LocalSocketPrivate)", LSPaddRead);
-// 		Logger::log("Bytes added for reading (LocalSocketPrivate)", readData.size());
-		m_readBuffer.enqueue(readData);
-// 		Logger::log("Read buffer size (LocalSocketPrivate)", m_readBuffer.size());
-		emit(readyRead());
-	}
-	
-	if(!readPackages.isEmpty())
-	{
-		foreach(const QByteArray& pkg, readPackages)
-		{
-			m_readPkgBuffer.enqueue(pkg);
-			emit(readyReadPackage());
-			
-// 			static	int	totalReadyReadPkg	=	0;
-// 			totalReadyReadPkg++;
-// 			qDebug("totalReadyReadPkg: %d", totalReadyReadPkg);
-		}
-	}
-	
-// 	qDebug("??? ~addReadData() - m_tmpReadBuffer.size() = %d", m_tmpReadBuffer.size());
+	close();
 }
 
 
-void LocalSocketPrivate::addReadSocketDescriptor(quintptr socketDescriptor, quintptr peerSocketDescriptor)
+void LocalSocketPrivate::notifyWrite()
 {
-	Q_ASSERT(socketDescriptor > 0);
-	
-	// Following data is at least one header
-	m_remainingReadBytes	=	Header_size;
-	
-	m_readSDescBuffer.enqueue(socketDescriptor);
-	
-	// Initialize header data
-// 	QByteArray			data;
-// 	data.resize(Header_size + sizeof(peerSocketDescriptor));
-	
-	// Set data
-	quintptr	pSD				=	qToBigEndian<quintptr>(peerSocketDescriptor);
-	quint32		totalSize	=	sizeof(pSD) + Header_size;
-	memcpy(m_writeBuffer.data() + Header_size, &pSD, sizeof(pSD));
-	
-	// Initialize header
-	// This must happen after copying the data as the CRC checksum gets generated here
-	struct Header	*	header	=	(struct Header*)m_writeBuffer.data();
-	INIT_HEADER((*header), sizeof(pSD), CMD_SOCK_SUC, m_writeBuffer.constData() + Header_size);
-	
-	quint32	written	=	0;
-	
-	while(isOpen() && written < totalSize)
-		written	+=	writeData(m_writeBuffer.constData() + written, totalSize - written);
-	
-// 	qDebug("!!! Written SOCK_SUC !!!");
-	
-	// Data has been written -> Remove from buffer
-	if(written != totalSize)
+	writeData();
+}
+
+
+void LocalSocketPrivate::flush()
+{
+	while(m_isOpen && !m_writeBuffer.isEmpty() && !m_currentReadData.isEmpty())
 	{
-		// An error must have already been set by the implementation
+// 		qDebug("[%p] LocalSocketPrivate::flush() - flushing", this);
+		writeData();
+		readData();
+	}
+}
+
+
+void LocalSocketPrivate::enableReadNotifier()
+{
+	if(!m_socketDescriptor)
 		return;
+	
+	if(!m_readNotifier)
+	{
+		m_readNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Read);
+		connect(m_readNotifier, SIGNAL(activated(int)), SLOT(readData()));
 	}
 	
-	emit(readyReadSocketDescriptor());
+	m_readNotifier->setEnabled(true);
+}
+
+
+void LocalSocketPrivate::disableReadNotifier()
+{
+	if(m_readNotifier)
+		m_readNotifier->setEnabled(false);
+}
+
+
+void LocalSocketPrivate::removeReadNotifier()
+{
+	if(m_readNotifier)
+	{
+		m_readNotifier->setEnabled(false);
+		delete	m_readNotifier;
+		m_readNotifier	=	0;
+	}
+}
+
+
+void LocalSocketPrivate::enableWriteNotifier()
+{
+	if(!m_socketDescriptor)
+		return;
+	
+	if(!m_writeNotifier)
+	{
+		m_writeNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Write);
+		connect(m_writeNotifier, SIGNAL(activated(int)), SLOT(writeData()));
+	}
+	
+	m_writeNotifier->setEnabled(true);
+}
+
+
+void LocalSocketPrivate::disableWriteNotifier()
+{
+	if(m_writeNotifier)
+		m_writeNotifier->setEnabled(false);
+}
+
+
+void LocalSocketPrivate::removeWriteNotifier()
+{
+	if(m_writeNotifier)
+	{
+		m_writeNotifier->setEnabled(false);
+		delete	m_writeNotifier;
+		m_writeNotifier	=	0;
+	}
+}
+
+
+void LocalSocketPrivate::enableExceptionNotifier()
+{
+	if(!m_socketDescriptor)
+		return;
+	
+	if(!m_exceptionNotifier)
+	{
+		m_exceptionNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Exception);
+		connect(m_exceptionNotifier, SIGNAL(activated(int)), SLOT(exception()));
+	}
+	
+	m_exceptionNotifier->setEnabled(true);
+}
+
+
+void LocalSocketPrivate::disableExceptionNotifier()
+{
+	if(m_exceptionNotifier)
+		m_exceptionNotifier->setEnabled(false);
+}
+
+
+void LocalSocketPrivate::removeExceptionNotifier()
+{
+	if(m_exceptionNotifier)
+	{
+		m_exceptionNotifier->setEnabled(false);
+		delete	m_exceptionNotifier;
+		m_exceptionNotifier	=	0;
+	}
 }
 
 
@@ -484,302 +269,321 @@ void LocalSocketPrivate::setOpened()
 	if(m_isOpen)
 		return;
 	
-	emit(connected());
 	m_isOpen	=	true;
+	
+	// Enable notifiers
+	enableReadNotifier();
+	enableWriteNotifier();
+	enableExceptionNotifier();
+	
+	writeData();
+	readData();
 }
 
 
 void LocalSocketPrivate::setClosed()
 {
-// 	qDebug("--- setClosed()");
-	
 	if(!m_isOpen)
 		return;
 	
+// 	qDebug("[%p] LocalSocketPrivate::setClosed()", this);
+	
 	m_isOpen	=	false;
+	m_socketDescriptor	=	0;
 	
-	emit(disconnected());
+	// Remove socket notifier
+	removeReadNotifier();
+	removeWriteNotifier();
+	removeExceptionNotifier();
 	
-	m_currentReadPackage.clear();
-	m_currentWritePackage.clear();
+	// Clear write data
+	if(m_currentlyWritingFileDescriptor)
+		delete m_currentlyWritingFileDescriptor;
+	m_currentlyWritingFileDescriptor	=	0;
+	m_currentWriteData.clear();
+	m_currentWriteDataPos	=	0;
+	m_writeBuffer.clear();
 	
-	m_writeDataBuffer.clear();
-	m_writePkgBuffer.clear();
-	m_writeSDescBuffer.clear();
+	// Clear temporary read data
+	m_currentReadData.clear();
+	m_tempReadBuffer.clear();
+	m_tempReadFileDescBuffer.clear();
+	
+	emit(m_q->disconnected());
 }
 
 
-void LocalSocketPrivate::setError(LocalSocket::LocalSocketError socketError, const QString &errorText)
+void LocalSocketPrivate::setError(const QString& errorString)
 {
-// 	qDebug("--- setError(): %s", qPrintable(errorText));
+// 	qDebug("[%p] LocalSocketPrivate::setError() - %s", this, qPrintable(errorString));
 	
-// 	Logger::log("Bytes written (LocalSocketPrivate)", 0, "E", "Error:\n" + errorText);
+	m_errorString	=	errorString;
+	
+	emit(m_q->error(m_errorString));
+	
+	setClosed();
+}
 
-	// Throw away consequential errors
-	if(m_hasError)
-		return;
+
+void LocalSocketPrivate::addReadFileDescriptor(quintptr fileDescriptor)
+{
+	m_tempReadFileDescBuffer.append(fileDescriptor);
 	
-	m_hasError	=	true;
+	checkTempReadData();
+}
+
+
+/*
+ * Header format:
+ * 
+ * Pos Type     Data
+ * -------------------------
+ * 0   quint8   Type
+ * 1   quint32  Optional id
+ * 5   quint32  Data size
+ * -------------------------
+ * Total size: 9 bytes
+ */
+void LocalSocketPrivate::readData()
+{
+// 	qDebug("[%p] LocalSocketPrivate::readData()", this);
 	
-	emit(error(socketError, errorText));
-	if(m_isOpen)
+	// Resize our read buffer
+	m_currentReadDataBuffer.resize(readBufferSize());
+	
+	// Try to read data
+	disableReadNotifier();
+	int	numRead	=	read(m_currentReadDataBuffer.data(), m_currentReadDataBuffer.size());
+	enableReadNotifier();
+	
+	// Handle read data
+	if(numRead > 0)
 	{
-		close();
-		setClosed();
-	}
-}
-
-
-quint32 LocalSocketPrivate::remainingReadBytes() const
-{
-	// If tempted to set m_remainingReadBytes to 0, set it to Header_size!
-	Q_ASSERT_X(m_remainingReadBytes != 0, __FILE__ ":" "remainingReadBytes()", "remainingReadBytes must always be greater than 0!");
-	
-	return m_remainingReadBytes;
-}
-
-
-bool LocalSocketPrivate::writeDataRotated()
-{
-// 	qDebug("writeDataRotated()");
-	
-	bool	ret	=	false;
-	
-	switch(m_lastWrittenType)
-	{
-		case LAST_WRITTEN_NONE:
-		case LAST_WRITTEN_PKG:
+		m_currentReadData.append(m_currentReadDataBuffer.constData(), numRead);
+		
+		// Analyze read data
+		while(!m_currentReadData.isEmpty())
 		{
-			ret	=	writeSocketDescriptor() || ret;
-			ret	=	writeData() || ret;
-			ret	=	writePackageData() || ret;
-		}break;
-		
-		case LAST_WRITTEN_DATA:
-		{
-			ret	=	writePackageData() || ret;
-			ret	=	writeSocketDescriptor() || ret;
-			ret	=	writeData() || ret;
-		}break;
-		
-		case LAST_WRITTEN_SDESC:
-		{
-			ret	=	writeData() || ret;
-			ret	=	writePackageData() || ret;
-			ret	=	writeSocketDescriptor() || ret;
-		}break;
-	}
-	
-	m_lastWrittenType++;
-	if(m_lastWrittenType > LAST_WRITTEN_MAX)
-		m_lastWrittenType	=	LAST_WRITTEN_MIN;
-	
-	return ret;
-}
-
-
-bool LocalSocketPrivate::writeData()
-{
-	// Check and write pending data
-	if(m_writeDataBuffer.isEmpty())
-		return false;
-	
-// 	QByteArray		data(m_writeDataBuffer.peek(m_writeBufferSize - Header_size));
-// 	QByteArray		data(QByteArray(Header_size, (char)0) + m_writeDataBuffer.dequeue(m_writeBufferSize - Header_size));
-	QByteArray		dequeuedData(m_writeDataBuffer.dequeue(m_writeBufferSizeNet));
-	quint32				totalSize	=	dequeuedData.size() + Header_size;
-	
-	// For debugging
-	
-// 	static quint64	totalWrittenLSPPeek	=	0;
-// 	totalWrittenLSPPeek	+=	data.size() - Header_size;
-// 	qDebug("total-written (LSP:dequeue): %llu", totalWrittenLSPPeek);
-// 	Logger::log("Bytes dequeued (LocalSocketPrivate)", totalWrittenLSPPeek);
-	
-// 	if(data.size() <= Header_size)
-// 		return false;
-	
-	// Copy data
-	memcpy(m_writeBuffer.data() + Header_size, dequeuedData.constData(), dequeuedData.size());
-	
-	// Initialize header data
-	struct Header	*	header	=	(Header*)m_writeBuffer.data();
-	INIT_HEADER(*header, dequeuedData.size(), CMD_DATA, m_writeBuffer.constData() + Header_size);
-	
-	quint32	written	=	0;
-	while(isOpen() && written < totalSize)
-		written	+=	writeData(m_writeBuffer.constData() + written, totalSize - written);
-	
-// 	qDebug("so(Header): %d, written: %d, totalSize: %d, dSize: %d", Header_size, written, totalSize, dequeuedData.size());
-	
-	// Data has been written
-	if(written == totalSize)
-	{
-		// For debugging
-		
-// 		static	quint64	totalWrittenLSUnix	=	0;
-// 		static	quint64	totalWrittenLSUnix_net	=	0;
-// 		totalWrittenLSUnix	+=	written + sizeof(header);
-// 		totalWrittenLSUnix_net	+=	written;
-// 		qDebug("total-written (ls): %llu (net: %llu) (available: %u)", totalWrittenLSUnix, totalWrittenLSUnix_net, m_writeBuffer.size());
-// 		Logger::log("Bytes written (LocalSocketPrivate)", totalWrittenLSUnix);
-// 		Logger::log("Bytes written net (LocalSocketPrivate)", totalWrittenLSUnix_net);
-// 		Logger::log("Bytes available for writing (LocalSocketPrivate)", m_writeBuffer.size());
-		
-		emit(bytesWritten(totalSize));
-		
-		return true;
-	}
-	else
-		return false;
-	// Otherwise isOpen() returned false -> an error was already raised
-}
-
-
-bool LocalSocketPrivate::writePackageData()
-{
-	// Fetch current package to write
-	if(m_currentWritePackage.size() - m_currentWritePackagePosition <= 0)
-	{
-		// Check and write pending data
-		if(m_writePkgBuffer.isEmpty())
-			return false;
-		
-		m_currentWritePackage					=	m_writePkgBuffer.dequeue();
-		m_writePkgBufferSize.fetchAndAddOrdered(-m_currentWritePackage.size());
-		m_currentWritePackagePosition	=	0;
-	}
-	else
-	{
-		// Free some space if we have at least 10*writeBufferSize to free
-		if(m_currentWritePackagePosition >= 10*m_writeBufferSize)
-		{
-			m_currentWritePackage					=		m_currentWritePackage.mid(10*m_writeBufferSize);
-			m_currentWritePackagePosition	-=	10*m_writeBufferSize;
+// 			qDebug("[%p] LocalSocketPrivate::readData() - reading data", this);
+			
+			// Read package size if available
+			if(!m_currentRequiredReadDataSize && m_currentReadData.size() >= HEADER_SIZE)
+			{
+				memcpy((char*)&m_currentRequiredReadDataSize, m_currentReadData.constData() + (HEADER_SIZE - sizeof(quint32)), sizeof(m_currentRequiredReadDataSize));
+				// Add header size
+				m_currentRequiredReadDataSize	+=	HEADER_SIZE;
+			}
+			
+			// Check if we can read a package
+			if(!m_currentRequiredReadDataSize || m_currentReadData.size() < m_currentRequiredReadDataSize)
+			{
+// 				qDebug("[%p] LocalSocketPrivate::readData() - Cannot read package yet: %d/%d", this, m_currentReadData.size(), m_currentRequiredReadDataSize);
+				break;
+			}
+			
+// 			static	int	_r_count	=	0;
+// 			_r_count++;
+// 			qDebug("[%p] LocalSocketPrivate::readData() - count: %d", this, _r_count);
+			
+			// Read meta data
+			int					dataPos	=	0;
+			quint8			readVarType;
+			quint32			readVarOptId;
+			quint32			readVarDataSize;
+			
+			// Type
+			memcpy((char*)&readVarType, m_currentReadData.constData() + dataPos, sizeof(readVarType));
+			dataPos	+=	sizeof(readVarType);
+			// Optional id
+			memcpy((char*)&readVarOptId, m_currentReadData.constData() + dataPos, sizeof(readVarOptId));
+			dataPos	+=	sizeof(readVarOptId);
+			// Data size
+			memcpy((char*)&readVarDataSize, m_currentReadData.constData() + dataPos, sizeof(readVarDataSize));
+			dataPos	+=	sizeof(readVarDataSize);
+			
+			Variant		readVar((Variant::Type)readVarType);
+			readVar.setOptionalId(readVarOptId);
+			
+			// Set data
+			if(readVarDataSize)
+			{
+				readVar.setValue(m_currentReadData.mid(dataPos, readVarDataSize));
+				dataPos	+=	readVarDataSize;
+			}
+			
+			// Remove data from buffer
+			m_currentReadData.remove(0, dataPos);
+			m_currentRequiredReadDataSize	=	0;
+			
+			// Append to temporary read buffer if necessary
+			if(readVar.type() == Variant::SocketDescriptor || !m_tempReadBuffer.isEmpty())
+				m_tempReadBuffer.append(readVar);
+			else
+			{
+				m_readBuffer.append(readVar);
+				// We have read a package
+				emit(m_q->readyRead());
+			}
 		}
 	}
 	
-	/// Total remaining size of package
-	quint32		size			=	m_currentWritePackage.size() - m_currentWritePackagePosition;
-	/// Data portion size of this transfer
-	quint32		dataSize	=	qMin(m_writeBufferSizeNet, size);
-	quint32		totalSize	=	dataSize + Header_size;
-	bool			endPkg		=	(dataSize == size);
+	checkTempReadData(true);
 	
-	// Copy data
-	memcpy(m_writeBuffer.data() + Header_size, m_currentWritePackage.constData() + m_currentWritePackagePosition, dataSize);
+// 	qDebug("[%p] LocalSocketPrivate::~readData()", this);
+}
+
+
+/*
+ * Header format:
+ * 
+ * Pos Type     Data
+ * -------------------------
+ * 0   quint8   Type
+ * 1   quint32  Optional id
+ * 5   quint32  Data size
+ * -------------------------
+ * Total size: 9 bytes
+ */
+void LocalSocketPrivate::writeData()
+{
+// 	qDebug("[%p] LocalSocketPrivate::writeData()", this);
 	
-	// Initialize header data
-	struct Header	*	header	=	(Header*)m_writeBuffer.data();
-	INIT_HEADER((*header), dataSize, endPkg ? CMD_PKG_END : CMD_PKG, m_currentWritePackage.constData() + m_currentWritePackagePosition);
-	
-// 	// Add header and data
-// 	QByteArray	data((const char*)&header, sizeof(header));
-// 	data.append(m_currentWritePackage.constData() + m_currentWritePackagePosition, dataSize);
-	
-	quint32	written	=	0;
-	
-	// Write all data
-	while(isOpen() && written < totalSize)
-		written	+=	writeData(m_writeBuffer.constData() + written, totalSize - written);
-	
-	// Data has been written -> Remove from buffer
-	if(written == totalSize)
+	// Move new data into the buffer
+	if(m_currentWriteData.isEmpty())
 	{
-		if(endPkg)
+		if(m_writeBuffer.isEmpty())
 		{
-			m_currentWritePackagePosition	=	0;
-			m_currentWritePackage.clear();
-			
-// 			static	int	totalPkgWritten	=	0;
-// 			totalPkgWritten++;
-// 			qDebug("totalPkgWritten: %d (toWrite: %d)", totalPkgWritten, m_writePkgBuffer.count());
-			
-			emit(packageWritten());
+			// Nothing to write so we don't need the notifier
+			disableWriteNotifier();
+// 			qDebug("[%p] LocalSocketPrivate::~writeData()", this);
+			return;
+		}
+		
+		Variant			writeVar(m_writeBuffer.takeFirst());
+		QByteArray	writeVarData(writeVar.toByteArray());
+		quint8			writeVarType			=	quint8(writeVar.type());
+		quint32			writeVarOptId			=	writeVar.optionalId();
+		quint32			writeVarDataSize	=	writeVarData.size();
+		
+// 		static	int	_w_count	=	0;
+// 		_w_count++;
+// 		qDebug("[%p] LocalSocketPrivate::writeData() - count: %d", this, _w_count);
+		
+		// File descriptors don't need the writeVars data as it is transferred via m_currentlyWritingFileDescriptor
+		if(writeVar.type() == Variant::SocketDescriptor)
+			writeVarDataSize	=	0;
+		
+		// Data to be written (including metadata)
+		QByteArray	data;
+		int					dataPos	=	0;
+		
+		data.resize(HEADER_SIZE);
+		// Set metadata
+		// type
+		memcpy(data.data() + dataPos, (const char*)&writeVarType, sizeof(writeVarType));
+		dataPos	+=	sizeof(writeVarType);
+		// optional id
+		memcpy(data.data() + dataPos, (const char*)&writeVarOptId, sizeof(writeVarOptId));
+		dataPos	+=	sizeof(writeVarOptId);
+		// data size
+		memcpy(data.data() + dataPos, (const char*)&writeVarDataSize, sizeof(writeVarDataSize));
+		dataPos	+=	sizeof(writeVarDataSize);
+		
+		// File descriptors don't need the writeVars data as it is transferred via m_currentlyWritingFileDescriptor
+		if(writeVar.type() == Variant::SocketDescriptor)
+		{
+			m_currentWriteData	=	data;
+			m_currentlyWritingFileDescriptor	=	new quintptr(writeVar.toSocketDescriptor());
 		}
 		else
-			m_currentWritePackagePosition	+=	dataSize;
-		
-		return true;
+			m_currentWriteData	=	data + writeVarData;
 	}
-	else
-		return false;
-	// Otherwise isOpen() returned false -> an error was already raised
-}
+	
+	// Get size of data to write
+	int	writeSize	=	qMin(availableWriteBufferSpace(), m_currentWriteData.size() - m_currentWriteDataPos);
 
-
-bool LocalSocketPrivate::writeSocketDescriptor()
-{
-	if(m_writeSDescBuffer.isEmpty())
-		return false;
-		
-	quintptr	sDesc	=	m_writeSDescBuffer.dequeue();
-	
-	// Don't write 0 socket descriptors
-	if(!sDesc)
-		return false;
-	
-// 	if(QCoreApplication::applicationFilePath().endsWith("external_peer"))
-// 	{
-// 		qFatal("!!! SENDING SOCKET !!!");
-// 	}
-	
-	// Send an package with 1 byte whos data will be ignored
-	quint32	totalSize	=	Header_size + 1;
-	// Set the one byte
-	*(m_writeBuffer.data() + Header_size)	=	0;
-	
-	// Initialize header data
-	struct Header	*	header	=	(Header*)m_writeBuffer.data();
-	INIT_HEADER((*header), totalSize - Header_size, CMD_SOCK, m_writeBuffer.constData() + Header_size);
-	
-	/*
-	 * First write the package and afterwards the actual socket
-	 * so the receiver can correctly notify the implementation that an socket is about to arrive
-	 */
-	
-	// Write package
-	quint32	writtenData	=	0;
-	
-	while(isOpen() && writtenData < totalSize)
-		writtenData	+=	writeData(m_writeBuffer.constData() + writtenData, totalSize - writtenData);
-	
-	// Write socket descriptor
-	bool	written	=	false;
-	
-	while(isOpen() && writtenData == totalSize && !written)
-		written	=	writeSocketDescriptor(sDesc);
-	
-	if(written && writtenData == totalSize)
+	// Check if we can write data
+	if(writeSize < 1)
 	{
-		/*
-		 * Don't emit socketDescriptorWritten() here as the socket might not be received by the peer yet
-		 * and it would not be safe to close the socket descriptor at this time.
-		 */
-		
-		return true;
+// 		qDebug("[%p] LocalSocketPrivate::~writeData()", this);
+		return;
 	}
-	else
-		return false;
-}
-
-
-bool LocalSocketPrivate::isOpen() const
-{
-	return	m_isOpen;
-}
-
-
-int __LocalSocketPrivate_init()
-{
-	LocalSocketPrivateEvent::LocalSocketPrivateType	=	static_cast<QEvent::Type>(QEvent::registerEventType());
 	
-	qRegisterMetaType<LocalSocket::LocalSocketError>("LocalSocket::LocalSocketError");
-	qRegisterMetaType<LocalSocket::LocalSocketState>("LocalSocket::LocalSocketState");
-	qRegisterMetaType<quintptr>("quintptr");
+	// Try to write data
+	disableWriteNotifier();
+	int	written		=	write(m_currentWriteData.constData() + m_currentWriteDataPos, writeSize, m_currentlyWritingFileDescriptor);
 	
-	return 1;
+	// Data was written
+	if(written > 0)
+	{
+// 		qDebug("[%p] LocalSocketPrivate::writeData() - written data: %d", this, written);
+		
+		m_currentWriteDataPos	+=	written;
+		
+		// Clear finished data
+		if(m_currentWriteDataPos >= m_currentWriteData.size())
+		{
+			m_currentWriteData.clear();
+			m_currentWriteDataPos	=	0;
+			if(m_currentlyWritingFileDescriptor)
+			{
+				delete m_currentlyWritingFileDescriptor;
+				m_currentlyWritingFileDescriptor	=	0;
+			}
+		}
+	}
+
+	// Only enable notifier if we have data to write
+	if(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty())
+		enableWriteNotifier();
+	
+// 	qDebug("[%p] LocalSocketPrivate::~writeData()", this);
 }
 
 
-Q_CONSTRUCTOR_FUNCTION(__LocalSocketPrivate_init);
+void LocalSocketPrivate::exception()
+{
+// 	qDebug("[%p] LocalSocketPrivate::exception()", this);
+	
+	// Just try to read data and we will get the correct behaviour
+	readData();
+}
+
+
+void LocalSocketPrivate::checkTempReadData(bool required)
+{
+// 	qDebug("[%p] LocalSocketPrivate::checkTempReadData()", this);
+
+	while(!m_tempReadBuffer.isEmpty())
+	{
+// 		qDebug("[%p] LocalSocketPrivate::checkTempReadData() - checking", this);
+		
+		if(m_tempReadBuffer.first().type() == Variant::SocketDescriptor)
+		{
+			if(m_tempReadFileDescBuffer.isEmpty() && !required)
+				break;
+		}
+		
+		Variant	src(m_tempReadBuffer.takeFirst());
+		
+		// Pop up normal data
+		if(src.type() != Variant::SocketDescriptor)
+			m_readBuffer.append(src);
+		else
+		{
+			quintptr	fileDescriptor	=	0;
+			
+			if(!m_tempReadFileDescBuffer.isEmpty())
+				fileDescriptor	=	m_tempReadFileDescBuffer.takeFirst();
+// 			else
+// 				qDebug("=== using 0");
+			
+			Variant	package(Variant::fromSocketDescriptor(fileDescriptor));
+			
+			package.setOptionalId(src.optionalId());
+			m_readBuffer.append(package);
+		}
+		
+		emit(m_q->readyRead());
+	}
+}

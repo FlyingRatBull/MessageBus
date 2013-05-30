@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,81 +19,73 @@
 #ifndef MESSAGEBUS_H
 #define MESSAGEBUS_H
 
-#include <QtCore>
+#include <QObject>
+#include <QList>
+#include <QReadWriteLock>
+#include <QWaitCondition>
 
-#include "global.h"
 #include "variant.h"
-
-class MessageBusPrivate;
-
-class LocalSocket;
+#include "localsocket.h"
+#include "localserver.h"
 
 class MessageBus : public QObject
 {
 	Q_OBJECT
 	
-	friend class MessageBusPrivate;
-	friend class MessageBusInterfacePrivate;
-	
-	Q_ENUMS(Error)
-
 	public:
-		enum Error
-		{
-			SocketError,
-			TransferDataError,
-			TransferSocketDescriptorError,
-			WaitAnswerError
-		};
+		MessageBus(QObject * callReceiver);
 		
-		MessageBus(const QString& service, const QString& object, QObject * parent = 0);
-
-		virtual ~MessageBus();
+		~MessageBus();
 		
-		void setCallRetTimeout(int ms = 30000);
-
-		///@warning callRet() must not be called within a function that is called by callRet() itself!
-		Variant callRet(const QString& slot, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant());
+		bool connectToServer(const QString& filename);
 		
-		Variant callRet(const QString& slot, qint64 timeout, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant());
-		
-		Variant callRet(const QString& slot, const QList<Variant>& args);
-		
-		Variant callRet(const QString& slot, qint64 timeout, const QList<Variant>& args);
-
-		void call(const QString& slot, const Variant& var1 = Variant(), const Variant& var2 = Variant(), const Variant& var3 = Variant(), const Variant& var4 = Variant(), const Variant& var5 = Variant());
-		
-		void call(const QString& slot, const QList<Variant>& args);
-		
-		virtual bool open();
-		
-		virtual void close();
+		bool listen(const QString& filename);
 		
 		bool isOpen() const;
 		
-		void setReceiver(QObject * obj);
+	public slots:
+		void deleteLater();
 		
-		QString errorString() const;
+		bool call(const QString& slot, const QList<Variant>& paramList);
+		
+		bool call(const QString& slot, const Variant& param1 = Variant(), const Variant& param2 = Variant(), const Variant& param3 = Variant(), const Variant& param4 = Variant(), const Variant& param5 = Variant());
 		
 	signals:
+		void clientConnected(MessageBus * bus);
+		
 		void disconnected();
 		
-		void error(MessageBus::Error error);
-		
 	private slots:
-		void onNewPackage();
-		
-		void onNewSocketDescriptor();
+		void onNewClient(quintptr socketDescriptor);
 		
 		void onDisconnected();
 		
-		void timerCheck();
+		void onNewPackage();
 		
 	private:
-		MSGBUS_LOCAL	MessageBus(QObject * target, LocalSocket * socket, QObject * parent);
+		bool writeHelper(const Variant& package);
+		
+		bool checkAckPackage();
+		
+		void handlePackage(Variant package);
 
 	private:
-		MessageBusPrivate			*	d;
+		QObject							*	m_callReceiver;
+		
+		LocalServer					*	m_server;
+		LocalSocket					*	m_peerSocket;
+		
+		// Received values
+		QByteArray								m_receivingCallSlot;
+		QList<Variant>						m_receivingCallArgs;
+		// Received file descriptors
+// 		QList<quintptr /* uid */>						m_awaitingCallFileDescriptors;
+		QList<quintptr /* file descriptor */>	m_receivingCallFileDescriptors;
+// 		quintptr														m_nextFileDescriptorUid;
+// 		QReadWriteLock											m_fileDescriptorsLock;
+// 		QWaitCondition											m_receivingCallFileDescriptorsChanged;
+		
+		QList<Variant>				m_tmpReadBuffer;
 };
 
 #endif // MESSAGEBUS_H
