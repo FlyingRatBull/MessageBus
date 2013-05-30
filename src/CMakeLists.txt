@@ -37,8 +37,6 @@ set(INST_HEADERS
 
 	MessageBus
 	messagebus.h
-	MessageBusInterface
-	messagebusinterface.h
 
 	global.h
 	tools.h
