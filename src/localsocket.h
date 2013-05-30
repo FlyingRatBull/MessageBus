@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,178 +19,62 @@
 #ifndef LOCALSOCKET_H
 #define LOCALSOCKET_H
 
-#include <QtCore>
-#include <QtNetwork>
+#include <QObject>
 
-#include "global.h"
+#include "variant.h"
 
-class LocalSocketPrivate_Thread;
-
-class LocalSocket : public QIODevice
+class LocalSocketPrivate;
+class LocalSocket : public QObject
 {
 	Q_OBJECT
 	
-	Q_ENUMS(LocalSocketError LocalSocketState)
-	
-	friend class LocalSocketPrivate_Thread;
-	
-	public:
-		enum LocalSocketError
-		{
-			ConnectionRefusedError,
-			PeerClosedError,
-			ServerNotFoundError,
-			SocketAccessError,
-			SocketResourceError,
-			SocketTimeoutError,
-			DatagramTooLargeError,
-			ConnectionError,
-			UnsupportedSocketOperationError,
-			UnknownSocketError
-		};
-		
-		enum LocalSocketState
-		{
-			UnconnectedState,
-			ConnectingState,
-			ConnectedState,
-			ClosingState
-		};
+	friend class LocalSocketPrivate;
 	
 	public:
 		LocalSocket(QObject * parent = 0);
 		
-		virtual ~LocalSocket();
+		~LocalSocket();
 		
-		virtual qint64 packagesAvailable() const;
+		bool connectToServer(const QString& filename);
 		
-		virtual qint64 socketDescriptorsAvailable() const;
+		bool setSocketDescriptor(quintptr socketDescriptor);
 		
-		virtual QByteArray readPackage();
-		
-		virtual quintptr readSocketDescriptor();
-		
-		virtual bool writePackage(const QByteArray& package);
-		
-		virtual bool writeSocketDescriptor(quintptr socketDescriptor);
-		
-		virtual bool waitForPackageWritten(int msecs);
-		
-		virtual bool waitForSocketDescriptorWritten(int msecs);
-		
-		virtual qint64 packagesToWrite() const;
-		
-		virtual qint64 socketDescriptorsToWrite() const;
-		
-		virtual bool waitForReadyReadPackage(int msecs);
-		
-		virtual bool waitForReadyReadSocketDescriptor(int msecs);
-		
-		/*
-		 * Functions from QLocalSocket
-		 */
-		void abort();
-		
-		void connectToServer(const QString& name, QIODevice::OpenMode mode);
-		
-		bool setSocketDescriptor(quintptr socketDescriptor, LocalSocketState socketState = ConnectedState, QIODevice::OpenMode openMode = QIODevice::ReadWrite);
-		
-		/**
-		 * @brief Returns the native socket descriptor of the LocalSocket object if this is available; otherwise returns 0.
-		 * 
-		 * @note Unlike the QLocalSocket implementation class this function returns 0 if no socket is available because quintptr is unsigned!
-		 *
-		 * @return quintptr
-		 **/
 		quintptr socketDescriptor() const;
 		
+		bool isOpen() const;
+		
+		Variant read(bool * ok = NULL);
+		
+		int availableData() const;
+		
+		int dataToWrite() const;
+		
+		bool waitForReadyRead(int timeout = 30000);
+		
+		bool waitForDataWritten(int timeout = 30000);
+		
+		QString lastErrorString() const;
+		
+	public slots:
 		void disconnectFromServer();
 		
-		LocalSocketError error() const;
-		
-		LocalSocketState state() const;
+		bool write(const Variant& data);
 		
 		bool flush();
 		
-		QString fullServerName() const;
-		
-		QString serverName() const;
-		
-		bool isValid() const;
-		
-		qint64 readBufferSize() const;
-		
-		void setReadBufferSize(qint64 size);
-		
-		qint64 writeBufferSize() const;
-		
-		void setWriteBufferSize(qint64 size);
-		
-		qint64 writePkgBufferSize() const;
-		
-		void setWritePkgBufferSize(qint64 size);
-		
-		bool waitForConnected(int msecs = 30000);
-		
-		bool waitForDisconnected(int msecs = 30000);
-		
-		/*
-		 * Functions from QIODevice
-		 */
-		virtual bool canReadLine() const;
-		
-		virtual bool isSequential()
-		{return true;}
-		
-		virtual void close()
-		{abort();}
-		
-		virtual bool open(QIODevice::OpenMode openMode)
-		{return state() == ConnectedState;}
-		
-		virtual qint64 bytesAvailable() const;
-		
-		virtual qint64 bytesToWrite() const;
-		
-		virtual bool waitForBytesWritten(int msecs);
-		
-		virtual bool waitForReadyRead(int msecs);
-		
 	signals:
-		void readyReadPackage();
-		
-		void readyReadSocketDescriptor();
-		
-		void packageWritten();
-		
-		/**
-		 * @brief An socket descriptor has been written
-		 * 
-		 * Unlike packageWritten() and bytesWritten() this signal gets only emitted when the file descriptor was received by the peer.
-		 * So upon receiving this signal it is save to close the file descriptor.
-		 *
-		 * @param socketDescriptor Socket descriptor that was successfully written to the peer.
-		 **/
-		void socketDescriptorWritten(quintptr socketDescriptor);
-		
-		/*
-		 * Signals from QLocalSocket
-		 */
 		void connected();
 		
 		void disconnected();
 		
-		void error(LocalSocket::LocalSocketError socketError);
+		void readyRead();
 		
-		void stateChanged(LocalSocket::LocalSocketState socketState);
-	
-	protected:
-		virtual qint64 readData(char *data, qint64 maxlen);
+		void dataWritten();
 		
-		virtual qint64 writeData(const char *data, qint64 len);
+		void error(const QString& errorString);
 		
 	private:
-		LocalSocketPrivate_Thread		*	const	d_ptr;
+		LocalSocketPrivate		*	const d_ptr;
 };
 
 #endif // LOCALSOCKET_H
