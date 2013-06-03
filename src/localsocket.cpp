@@ -18,6 +18,8 @@
 
 #include "localsocket.h"
 
+#include <QThread>
+
 #if defined(Q_OS_UNIX) || defined(Q_OS_LINX)
 	#include "implementations/localsocketprivate_unix.h"
 #else
@@ -159,6 +161,8 @@ bool LocalSocket::write(const Variant& data)
 {
 	if(!isOpen())
 		return false;
+	
+	Q_ASSERT(QThread::currentThread() == thread());
 	
 	d_ptr->m_writeBuffer.append(data);
 	d_ptr->notifyWrite();

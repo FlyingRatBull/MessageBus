@@ -18,6 +18,8 @@
 
 #include "localsocketprivate.h"
 
+#include <QThread>
+
 #define HEADER_SIZE (sizeof(quint8) + sizeof(quint32) + sizeof(quint32))
 
 LocalSocketPrivate::LocalSocketPrivate(LocalSocket * q)
@@ -346,6 +348,8 @@ void LocalSocketPrivate::addReadFileDescriptor(quintptr fileDescriptor)
  */
 void LocalSocketPrivate::readData()
 {
+	Q_ASSERT(QThread::currentThread() == thread());
+	
 // 	qDebug("[%p] LocalSocketPrivate::readData()", this);
 	
 	// Resize our read buffer
@@ -446,6 +450,8 @@ void LocalSocketPrivate::readData()
  */
 void LocalSocketPrivate::writeData()
 {
+	Q_ASSERT(QThread::currentThread() == thread());
+	
 // 	qDebug("[%p] LocalSocketPrivate::writeData()", this);
 	
 	// Move new data into the buffer
