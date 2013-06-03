@@ -25,6 +25,7 @@
 #include <QList>
 #include <QElapsedTimer>
 #include <QSocketNotifier>
+#include <QReadWriteLock>
 
 class LocalSocketPrivate : public QObject
 {
@@ -68,8 +69,10 @@ class LocalSocketPrivate : public QObject
 		 * Data variables
 		 */
 		// Output buffer
+		QReadWriteLock		m_writeBufferLock;
 		QList<Variant>		m_writeBuffer;
 		// Input buffer
+		QReadWriteLock		m_readBufferLock;
 		QList<Variant>		m_readBuffer;
 		// Currently writing data (including Variant type and id)
 		QByteArray				m_currentWriteData;

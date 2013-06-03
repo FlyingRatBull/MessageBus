@@ -77,6 +77,8 @@ bool LocalSocket::isOpen() const
 
 Variant LocalSocket::read(bool* ok)
 {
+	QReadLocker		readLock(&d_ptr->m_readBufferLock);
+	
 	if(d_ptr->m_readBuffer.isEmpty())
 	{
 		if(ok)
@@ -96,12 +98,16 @@ Variant LocalSocket::read(bool* ok)
 
 int LocalSocket::availableData() const
 {
+	QReadLocker		readLock(&d_ptr->m_readBufferLock);
+	
 	return d_ptr->m_readBuffer.count();
 }
 
 
 int LocalSocket::dataToWrite() const
 {
+	QWriteLocker		writeLock(&d_ptr->m_writeBufferLock);
+	
 	return d_ptr->m_writeBuffer.count() + (d_ptr->m_currentWriteData.isEmpty() ? 0 : 1);
 }
 
@@ -111,8 +117,11 @@ bool LocalSocket::waitForReadyRead(int timeout)
 	if(!isOpen())
 		return false;
 	
-	if(!d_ptr->m_readBuffer.isEmpty())
-		return true;
+	{
+		QReadLocker		readLock(&d_ptr->m_readBufferLock);
+		if(!d_ptr->m_readBuffer.isEmpty())
+			return true;
+	}
 	
 	QElapsedTimer	timer;
 	timer.start();
@@ -129,8 +138,11 @@ bool LocalSocket::waitForDataWritten(int timeout)
 	if(!isOpen())
 		return false;
 	
-	if(d_ptr->m_writeBuffer.isEmpty() && d_ptr->m_currentWriteData.isEmpty())
-		return true;
+	{
+		QWriteLocker		writeLock(&d_ptr->m_writeBufferLock);
+		if(d_ptr->m_writeBuffer.isEmpty() && d_ptr->m_currentWriteData.isEmpty())
+			return true;
+	}
 	
 	QElapsedTimer	timer;
 	timer.start();
@@ -162,9 +174,11 @@ bool LocalSocket::write(const Variant& data)
 	if(!isOpen())
 		return false;
 	
-	Q_ASSERT(QThread::currentThread() == thread());
+	{
+		QWriteLocker		writeLock(&d_ptr->m_writeBufferLock);
+		d_ptr->m_writeBuffer.append(data);
+	}
 	
-	d_ptr->m_writeBuffer.append(data);
 	d_ptr->notifyWrite();
 	
 	return true;

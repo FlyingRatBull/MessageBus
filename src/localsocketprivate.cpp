@@ -51,10 +51,12 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	
 	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
 	{
-		// Do we need to write?
-		readyWrite	=	(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
-		// We need to read
-		readyRead		=	true;
+		QReadLocker		readLocker(&m_writeBufferLock);
+			// Do we need to write?
+			readyWrite	=	(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
+			// We need to read
+			readyRead		=	true;
+		readLocker.unlock();
 		
 		bool	ret	=	waitForReadOrWrite(readyRead, readyWrite, (timeout > 0 ? timeout - timer.elapsed() : 0));
 		
@@ -158,11 +160,15 @@ void LocalSocketPrivate::notifyWrite()
 
 void LocalSocketPrivate::flush()
 {
+	QReadLocker		readLocker(&m_writeBufferLock);
 	while(m_isOpen && !m_writeBuffer.isEmpty() && !m_currentReadData.isEmpty())
 	{
+		readLocker.unlock();
 // 		qDebug("[%p] LocalSocketPrivate::flush() - flushing", this);
 		writeData();
 		readData();
+		
+		readLocker.relock();
 	}
 }
 
@@ -298,6 +304,9 @@ void LocalSocketPrivate::setClosed()
 	removeWriteNotifier();
 	removeExceptionNotifier();
 	
+	QWriteLocker		writeLocker(&m_writeBufferLock);
+	QWriteLocker		writeLocker2(&m_readBufferLock);
+	
 	// Clear write data
 	if(m_currentlyWritingFileDescriptor)
 		delete m_currentlyWritingFileDescriptor;
@@ -348,8 +357,6 @@ void LocalSocketPrivate::addReadFileDescriptor(quintptr fileDescriptor)
  */
 void LocalSocketPrivate::readData()
 {
-	Q_ASSERT(QThread::currentThread() == thread());
-	
 // 	qDebug("[%p] LocalSocketPrivate::readData()", this);
 	
 	// Resize our read buffer
@@ -424,7 +431,10 @@ void LocalSocketPrivate::readData()
 				m_tempReadBuffer.append(readVar);
 			else
 			{
-				m_readBuffer.append(readVar);
+				{
+					QWriteLocker	writeLock(&m_readBufferLock);
+					m_readBuffer.append(readVar);
+				}
 				// We have read a package
 				emit(m_q->readyRead());
 			}
@@ -450,9 +460,9 @@ void LocalSocketPrivate::readData()
  */
 void LocalSocketPrivate::writeData()
 {
-	Q_ASSERT(QThread::currentThread() == thread());
-	
 // 	qDebug("[%p] LocalSocketPrivate::writeData()", this);
+	
+	QReadLocker		readLocker(&m_writeBufferLock);
 	
 	// Move new data into the buffer
 	if(m_currentWriteData.isEmpty())
@@ -574,9 +584,15 @@ void LocalSocketPrivate::checkTempReadData(bool required)
 		
 		// Pop up normal data
 		if(src.type() != Variant::SocketDescriptor)
+		{
+			QWriteLocker	writeLock(&m_readBufferLock);
+			
 			m_readBuffer.append(src);
+		}
 		else
 		{
+			QWriteLocker	writeLock(&m_readBufferLock);
+			
 			quintptr	fileDescriptor	=	0;
 			
 			if(!m_tempReadFileDescBuffer.isEmpty())
