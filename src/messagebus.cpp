@@ -46,6 +46,8 @@ MessageBus::~MessageBus()
 
 bool MessageBus::connectToServer(const QString& filename)
 {
+	QWriteLocker		socketLocker(&m_socketLock);
+	
 	if(m_peerSocket)
 		return false;
 	
@@ -58,8 +60,8 @@ bool MessageBus::connectToServer(const QString& filename)
 	
 	if(result)
 	{
-		connect(socket, SIGNAL(disconnected()), SLOT(onDisconnected()));
-		connect(socket, SIGNAL(readyRead()), SLOT(onNewPackage()));
+		connect(socket, SIGNAL(disconnected()), SLOT(onDisconnected()), Qt::QueuedConnection);
+		connect(socket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
 		
 		m_peerSocket	=	socket;
 	}
@@ -72,6 +74,8 @@ bool MessageBus::connectToServer(const QString& filename)
 
 void MessageBus::disconnectFromServer()
 {
+	QWriteLocker		socketLocker(&m_socketLock);
+	
 	if(!m_peerSocket)
 		return;
 	
@@ -81,6 +85,8 @@ void MessageBus::disconnectFromServer()
 
 bool MessageBus::listen(const QString& filename)
 {
+	QWriteLocker		socketLocker(&m_socketLock);
+	
 	if(m_peerSocket || m_server)
 		return false;
 	
@@ -105,12 +111,16 @@ bool MessageBus::listen(const QString& filename)
 
 bool MessageBus::isOpen() const
 {
+	QReadLocker		socketLocker(&m_socketLock);
+	
 	return (m_peerSocket && m_peerSocket->isOpen());
 }
 
 
 void MessageBus::deleteLater()
 {
+	QReadLocker		socketLocker(&m_socketLock);
+	
 	if(m_peerSocket)
 		m_peerSocket->disconnectFromServer();
 	
@@ -125,6 +135,8 @@ void MessageBus::deleteLater()
 
 bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 {
+	QReadLocker		socketLocker(&m_socketLock);
+	
 	if(!m_peerSocket)
 		return false;
 	
@@ -173,9 +185,13 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 		disconnect(m_peerSocket, SIGNAL(readyRead()), this, 0);
 		
 		while(m_peerSocket && m_peerSocket->isOpen() && !checkAckPackage())
+		{
+			socketLocker.unlock();
 			m_peerSocket->waitForReadyRead(1000);
+			socketLocker.relock();
+		}
 		
-		connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()));
+		connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
 		callSlotQueued(this, "onNewPackage");
 	}
 	//qDebug("Waited for ACK package");
@@ -187,9 +203,6 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 
 bool MessageBus::call(const QString& slot, const Variant& param1, const Variant& param2, const Variant& param3, const Variant& param4, const Variant& param5)
 {
-	if(!m_peerSocket)
-		return false;
-	
 	QList<Variant>	params;
 	
 	if(param1.isValid())
@@ -232,8 +245,8 @@ void MessageBus::onNewClient(quintptr socketDescriptor)
 	bus->m_peerSocket = socket;
 // 	socket->setWritePkgBufferSize(10485760 /* 10M */);
 	
-	connect(socket, SIGNAL(disconnected()), bus, SLOT(onDisconnected()));
-	connect(socket, SIGNAL(readyRead()), bus, SLOT(onNewPackage()));
+	connect(socket, SIGNAL(disconnected()), bus, SLOT(onDisconnected()), Qt::QueuedConnection);
+	connect(socket, SIGNAL(readyRead()), bus, SLOT(onNewPackage()), Qt::QueuedConnection);
 	
 	emit(clientConnected(bus));
 }
@@ -241,6 +254,8 @@ void MessageBus::onNewClient(quintptr socketDescriptor)
 
 void MessageBus::onDisconnected()
 {
+	QWriteLocker		socketLocker(&m_socketLock);
+	
 	if(!m_peerSocket)
 		return;
 	
@@ -249,6 +264,7 @@ void MessageBus::onDisconnected()
 	LocalSocket	*	socket	=	0;
 	socket	=	m_peerSocket;
 	m_peerSocket = 0;
+	socketLocker.unlock();
 	
  	emit(disconnected());
 	
@@ -258,6 +274,8 @@ void MessageBus::onDisconnected()
 
 void MessageBus::onNewPackage()
 {
+	QReadLocker		socketLocker(&m_socketLock);
+	
 // 	qDebug("onNewPackage()");
 	if(!m_peerSocket)
 		return;
@@ -268,16 +286,18 @@ void MessageBus::onNewPackage()
 		// Read package
 		Variant		package(m_peerSocket->read());
 	
-		m_tmpReadBuffer.append(package);
+		m_tmpReadBuffer.enqueue(package);
 	}
+	socketLocker.unlock();
 	
 	while(!m_tmpReadBuffer.isEmpty())
-		handlePackage(m_tmpReadBuffer.takeFirst());
+		handlePackage(m_tmpReadBuffer.dequeue());
 }
 
 
 bool MessageBus::writeHelper(const Variant &package)
 {
+	QReadLocker		socketLocker(&m_socketLock);
 	//qDebug("Writing package of size %d", package.size());
 	
 	while(m_peerSocket && !m_peerSocket->write(package))
@@ -294,6 +314,8 @@ bool MessageBus::writeHelper(const Variant &package)
 
 bool MessageBus::checkAckPackage()
 {
+	// socket lock should already be locked by call()
+	
 	if(!m_peerSocket->availableData())
 		return false;
 	
@@ -317,7 +339,7 @@ bool MessageBus::checkAckPackage()
 		package.setOptionalId(PKG_TYPE_END_ACKNOWLEDGED);
 	}
 	
-	m_tmpReadBuffer.append(package);
+	m_tmpReadBuffer.enqueue(package);
 	
 	return false;
 }

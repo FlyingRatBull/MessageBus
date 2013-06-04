@@ -58,6 +58,7 @@ class LocalSocketPrivate : public QObject
 		/*
 		 * Control variables
 		 */
+		QReadWriteLock		m_controlLock;
 		// Connected?
 		bool				m_isOpen;
 		// Socket descriptor

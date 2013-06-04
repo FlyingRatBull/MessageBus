@@ -49,8 +49,11 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	disableWriteNotifier();
 	disableExceptionNotifier();
 	
+	QReadLocker		controlLock(&m_controlLock);
+	
 	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
 	{
+		controlLock.unlock();
 		QReadLocker		readLocker(&m_writeBufferLock);
 			// Do we need to write?
 			readyWrite	=	(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
@@ -63,6 +66,7 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 		// Failed to wait
 		if(!ret)
 		{
+			controlLock.relock();
 			if(m_isOpen)
 			{
 				enableReadNotifier();
@@ -85,6 +89,7 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 		readyRead		=	false;
 		readyWrite	=	false;
 	}
+	controlLock.unlock();
 	
 	enableReadNotifier();
 	enableWriteNotifier();
@@ -103,8 +108,12 @@ bool LocalSocketPrivate::waitForDataWritten(QElapsedTimer& timer, int timeout)
 	disableWriteNotifier();
 	disableExceptionNotifier();
 	
+	QReadLocker		controlLock(&m_controlLock);
+	
 	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
 	{
+		controlLock.unlock();
+		
 		// We need to read and to write
 		readyWrite	=	true;
 		// We need to read
@@ -115,6 +124,8 @@ bool LocalSocketPrivate::waitForDataWritten(QElapsedTimer& timer, int timeout)
 		// Failed to wait
 		if(!ret)
 		{
+			controlLock.relock();
+			
 			if(m_isOpen)
 			{
 				enableReadNotifier();
@@ -137,6 +148,7 @@ bool LocalSocketPrivate::waitForDataWritten(QElapsedTimer& timer, int timeout)
 		readyRead		=	false;
 		readyWrite	=	false;
 	}
+	controlLock.unlock();
 	
 	enableReadNotifier();
 	enableWriteNotifier();
@@ -161,20 +173,26 @@ void LocalSocketPrivate::notifyWrite()
 void LocalSocketPrivate::flush()
 {
 	QReadLocker		readLocker(&m_writeBufferLock);
+	QReadLocker		controlLock(&m_controlLock);
+	
 	while(m_isOpen && !m_writeBuffer.isEmpty() && !m_currentReadData.isEmpty())
 	{
+		controlLock.unlock();
 		readLocker.unlock();
 // 		qDebug("[%p] LocalSocketPrivate::flush() - flushing", this);
 		writeData();
 		readData();
 		
 		readLocker.relock();
+		controlLock.relock();
 	}
 }
 
 
 void LocalSocketPrivate::enableReadNotifier()
 {
+	QReadLocker		controlLock(&m_controlLock);
+	
 	if(!m_socketDescriptor)
 		return;
 	
@@ -208,6 +226,8 @@ void LocalSocketPrivate::removeReadNotifier()
 
 void LocalSocketPrivate::enableWriteNotifier()
 {
+	QReadLocker		controlLock(&m_controlLock);
+	
 	if(!m_socketDescriptor)
 		return;
 	
@@ -241,6 +261,8 @@ void LocalSocketPrivate::removeWriteNotifier()
 
 void LocalSocketPrivate::enableExceptionNotifier()
 {
+	QReadLocker		controlLock(&m_controlLock);
+	
 	if(!m_socketDescriptor)
 		return;
 	
@@ -274,10 +296,13 @@ void LocalSocketPrivate::removeExceptionNotifier()
 
 void LocalSocketPrivate::setOpened()
 {
+	QWriteLocker		controlLock(&m_controlLock);
+	
 	if(m_isOpen)
 		return;
 	
 	m_isOpen	=	true;
+	controlLock.unlock();
 	
 	// Enable notifiers
 	enableReadNotifier();
@@ -291,6 +316,8 @@ void LocalSocketPrivate::setOpened()
 
 void LocalSocketPrivate::setClosed()
 {
+	QWriteLocker		controlLock(&m_controlLock);
+	
 	if(!m_isOpen)
 		return;
 	
@@ -298,6 +325,7 @@ void LocalSocketPrivate::setClosed()
 	
 	m_isOpen	=	false;
 	m_socketDescriptor	=	0;
+	controlLock.unlock();
 	
 	// Remove socket notifier
 	removeReadNotifier();
@@ -328,9 +356,12 @@ void LocalSocketPrivate::setError(const QString& errorString)
 {
 // 	qDebug("[%p] LocalSocketPrivate::setError() - %s", this, qPrintable(errorString));
 	
-	m_errorString	=	errorString;
+	{
+		QWriteLocker		controlLock(&m_controlLock);
+		m_errorString	=	errorString;
+	}
 	
-	emit(m_q->error(m_errorString));
+	emit(m_q->error(errorString));
 	
 	setClosed();
 }

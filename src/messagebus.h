@@ -27,6 +27,7 @@
 #include "variant.h"
 #include "localsocket.h"
 #include "localserver.h"
+#include "tsqueue.h"
 
 class MessageBus : public QObject
 {
@@ -74,6 +75,7 @@ class MessageBus : public QObject
 	private:
 		QObject							*	m_callReceiver;
 		
+		mutable QReadWriteLock				m_socketLock;
 		LocalServer					*	m_server;
 		LocalSocket					*	m_peerSocket;
 		
@@ -87,7 +89,7 @@ class MessageBus : public QObject
 // 		QReadWriteLock											m_fileDescriptorsLock;
 // 		QWaitCondition											m_receivingCallFileDescriptorsChanged;
 		
-		QList<Variant>				m_tmpReadBuffer;
+		TsQueue<Variant>				m_tmpReadBuffer;
 };
 
 #endif // MESSAGEBUS_H

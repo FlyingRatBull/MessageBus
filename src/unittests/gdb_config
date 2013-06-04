@@ -1,1 +1,1 @@
-set follow-fork-mode child
+#set follow-fork-mode child

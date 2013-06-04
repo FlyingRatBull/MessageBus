@@ -65,12 +65,16 @@ bool LocalSocket::setSocketDescriptor(quintptr socketDescriptor)
 
 quintptr LocalSocket::socketDescriptor() const
 {
+	QReadLocker		controlLock(&d_ptr->m_controlLock);
+	
 	return d_ptr->m_socketDescriptor;
 }
 
 
 bool LocalSocket::isOpen() const
 {
+	QReadLocker		controlLock(&d_ptr->m_controlLock);
+	
 	return d_ptr->m_isOpen && d_ptr->m_errorString.isEmpty();
 }
 
@@ -156,6 +160,8 @@ bool LocalSocket::waitForDataWritten(int timeout)
 
 QString LocalSocket::lastErrorString() const
 {
+	QReadLocker		controlLock(&d_ptr->m_controlLock);
+	
 	return d_ptr->m_errorString;
 }
 
