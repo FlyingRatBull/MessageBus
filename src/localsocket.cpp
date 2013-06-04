@@ -81,7 +81,7 @@ bool LocalSocket::isOpen() const
 
 Variant LocalSocket::read(bool* ok)
 {
-	QReadLocker		readLock(&d_ptr->m_readBufferLock);
+	QWriteLocker		readLock(&d_ptr->m_readBufferLock);
 	
 	if(d_ptr->m_readBuffer.isEmpty())
 	{
