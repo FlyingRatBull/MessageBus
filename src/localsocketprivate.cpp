@@ -199,6 +199,8 @@ void LocalSocketPrivate::enableReadNotifier()
 	if(!m_socketDescriptor)
 		return;
 	
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(!m_readNotifier)
 	{
 		m_readNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Read);
@@ -211,6 +213,8 @@ void LocalSocketPrivate::enableReadNotifier()
 
 void LocalSocketPrivate::disableReadNotifier()
 {
+	QReadLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_readNotifier)
 		m_readNotifier->setEnabled(false);
 }
@@ -218,6 +222,8 @@ void LocalSocketPrivate::disableReadNotifier()
 
 void LocalSocketPrivate::removeReadNotifier()
 {
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_readNotifier)
 	{
 		m_readNotifier->setEnabled(false);
@@ -234,6 +240,8 @@ void LocalSocketPrivate::enableWriteNotifier()
 	if(!m_socketDescriptor)
 		return;
 	
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(!m_writeNotifier)
 	{
 		m_writeNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Write);
@@ -246,6 +254,8 @@ void LocalSocketPrivate::enableWriteNotifier()
 
 void LocalSocketPrivate::disableWriteNotifier()
 {
+	QReadLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_writeNotifier)
 		m_writeNotifier->setEnabled(false);
 }
@@ -253,6 +263,8 @@ void LocalSocketPrivate::disableWriteNotifier()
 
 void LocalSocketPrivate::removeWriteNotifier()
 {
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_writeNotifier)
 	{
 		m_writeNotifier->setEnabled(false);
@@ -269,6 +281,8 @@ void LocalSocketPrivate::enableExceptionNotifier()
 	if(!m_socketDescriptor)
 		return;
 	
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(!m_exceptionNotifier)
 	{
 		m_exceptionNotifier	=	new QSocketNotifier(m_socketDescriptor, QSocketNotifier::Exception);
@@ -281,6 +295,8 @@ void LocalSocketPrivate::enableExceptionNotifier()
 
 void LocalSocketPrivate::disableExceptionNotifier()
 {
+	QReadLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_exceptionNotifier)
 		m_exceptionNotifier->setEnabled(false);
 }
@@ -288,6 +304,8 @@ void LocalSocketPrivate::disableExceptionNotifier()
 
 void LocalSocketPrivate::removeExceptionNotifier()
 {
+	QWriteLocker		notifierLocker(&m_notifierLock);
+	
 	if(m_exceptionNotifier)
 	{
 		m_exceptionNotifier->setEnabled(false);

@@ -149,6 +149,7 @@ class LocalSocketPrivate : public QObject
 	private:
 		LocalSocket				*	m_q;
 		
+		QReadWriteLock			m_notifierLock;
 		QSocketNotifier		*	m_readNotifier;
 		QSocketNotifier		*	m_writeNotifier;
 		QSocketNotifier		*	m_exceptionNotifier;
