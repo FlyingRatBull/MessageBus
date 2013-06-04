@@ -186,9 +186,7 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 		
 		while(m_peerSocket && m_peerSocket->isOpen() && !checkAckPackage())
 		{
-			socketLocker.unlock();
 			m_peerSocket->waitForReadyRead(1000);
-			socketLocker.relock();
 		}
 		
 		connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
