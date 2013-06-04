@@ -37,6 +37,9 @@ LocalSocketPrivate::~LocalSocketPrivate()
 	
 	if(m_currentlyWritingFileDescriptor)
 		delete m_currentlyWritingFileDescriptor;
+	
+	QWriteLocker		readBufferLock(&m_readBufferLock);
+	m_readBuffer.clear();
 }
 
 
@@ -333,7 +336,6 @@ void LocalSocketPrivate::setClosed()
 	removeExceptionNotifier();
 	
 	QWriteLocker		writeLocker(&m_writeBufferLock);
-	QWriteLocker		writeLocker2(&m_readBufferLock);
 	
 	// Clear write data
 	if(m_currentlyWritingFileDescriptor)
