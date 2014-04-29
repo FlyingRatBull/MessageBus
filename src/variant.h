@@ -115,6 +115,8 @@ class Variant
     Variant(const QVariantMap& map);
     
     Variant(const QVariantList& list);
+    
+    Variant(const QList<Variant>& list);
 		
 		Variant(const Variant& other);
 		
@@ -133,6 +135,8 @@ class Variant
     Variant& operator = (const QVariantMap& other);
     
     Variant& operator = (const QVariantList& other);
+    
+    Variant& operator = (const QList<Variant>& other);
 		
 		Variant& operator = (bool boolean);
 		
@@ -187,6 +191,8 @@ class Variant
     void setValue(const QVariantMap& value);
     
     void setValue(const QVariantList& value);
+    
+    void setValue(const QList<Variant>& value);
 		
 		void setValue(bool boolean);
 		
@@ -212,9 +218,11 @@ class Variant
 		
 		QString toString(bool * ok = 0) const;
     
-    QVariantMap toMap(bool * ok = 0) const;
+    QVariantMap toQMap(bool * ok = 0) const;
     
-    QVariantList toList(bool * ok = 0) const;
+    QVariantList toQList(bool * ok = 0) const;
+    
+    QList<Variant> toList(bool * ok = 0) const;
     
     QVariant toQVariant(bool * ok = 0) const;
 		
@@ -248,6 +256,8 @@ class Variant
     static Variant fromMap(const QVariantMap& map);
     
     static Variant fromList(const QVariantList& list);
+    
+    static Variant fromList(const QList<Variant>& list);
 		
 	private:
 		quint64 getUIntNumber(quint8 size, bool * ok) const;

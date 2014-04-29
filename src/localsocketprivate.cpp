@@ -97,7 +97,7 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	enableReadNotifier();
 	enableWriteNotifier();
 	enableExceptionNotifier();
-	
+  
 	return readyRead;
 }
 
@@ -156,7 +156,7 @@ bool LocalSocketPrivate::waitForDataWritten(QElapsedTimer& timer, int timeout)
 	enableReadNotifier();
 	enableWriteNotifier();
 	enableExceptionNotifier();
-	
+  
 	return readyWrite;
 }
 

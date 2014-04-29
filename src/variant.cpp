@@ -111,6 +111,13 @@ Variant::Variant(const QVariantList& list)
 }
 
 
+Variant::Variant(const QList< Variant >& list)
+: m_type(List), m_optId(0)
+{
+  setValue(list);
+}
+
+
 Variant::Variant(bool boolean)
 : m_type(Bool), m_optId(0)
 {
@@ -354,6 +361,14 @@ Variant& Variant::operator = (const QVariantList& other)
 }
 
 
+Variant& Variant::operator=(const QList< Variant >& other)
+{
+  m_type  = List;
+  setValue(other);
+  return *this;
+}
+
+
 Variant& Variant::operator = (bool boolean)
 {
 	m_type	=	Bool;
@@ -572,6 +587,37 @@ void Variant::setValue(const QVariantList& value)
 }
 
 
+void Variant::setValue(const QList< Variant >& value)
+{
+  QByteArray  data;
+  QByteArray  key;
+  data.reserve(sizeof(quint64) + value.count() * (sizeof(quint32) * 2 + 32));
+  
+  // Format:
+  // [item count][value size][value]...
+  
+  // item count
+  quint64 itemCount = value.count();
+  data.resize(data.size() + sizeof(itemCount));
+  *((quint64*)(&(data.data()[data.size() - sizeof(itemCount)]))) = itemCount;
+  
+  QListIterator<Variant>   it(value);
+  while(it.hasNext()) {
+    QByteArray  value(it.next().toByteArray());
+    
+    // value size
+    quint32 size = value.size();
+    data.resize(data.size() + sizeof(size));
+    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;
+    
+    // value
+    data.append(value);
+  }
+  
+  m_data  = data;
+}
+
+
 void Variant::setValue(bool boolean)
 {
 	setValue((char)boolean);
@@ -662,7 +708,7 @@ quint64 Variant::toUInt64(bool * ok) const
 			return toString(ok).toULongLong(ok);break;
       
     case List: {
-      QVariantList  list(toList(ok));
+      QVariantList  list(toQList(ok));
       
       if(ok && !*ok)
         return 0;
@@ -723,7 +769,7 @@ qint64 Variant::toInt64(bool * ok) const
       
       
     case List: {
-      QVariantList  list(toList(ok));
+      QVariantList  list(toQList(ok));
       
       if(ok && !*ok)
         return 0;
@@ -784,7 +830,7 @@ QString Variant::toString(bool * ok) const
 		}break;
     
     case Map: {
-      QVariantMap map(toMap());
+      QVariantMap map(toQMap());
       QString     ret("{");
         
       QMapIterator<QString, QVariant>   it(map);
@@ -804,7 +850,7 @@ QString Variant::toString(bool * ok) const
     }break;
     
     case List: {
-      QVariantList  list(toList());
+      QVariantList  list(toQList());
       QString       ret("[");
         
       QListIterator<QVariant>   it(list);
@@ -885,7 +931,7 @@ QString Variant::toString(bool * ok) const
 }
 
 
-QVariantMap Variant::toMap(bool* ok) const
+QVariantMap Variant::toQMap(bool* ok) const
 {
   if(ok)
     (*ok) = true;
@@ -929,7 +975,7 @@ QVariantMap Variant::toMap(bool* ok) const
     }break;
     
     case List: {
-      QVariantList  list(toList(ok));
+      QVariantList  list(toQList(ok));
       QVariantMap   ret;
       
       if(ok && !*ok)
@@ -958,7 +1004,7 @@ QVariantMap Variant::toMap(bool* ok) const
 }
 
 
-QVariantList Variant::toList(bool* ok) const
+QVariantList Variant::toQList(bool* ok) const
 {
   if(ok)
     (*ok) = true;
@@ -966,7 +1012,7 @@ QVariantList Variant::toList(bool* ok) const
   ///@todo Complete switch
   switch(m_type) {
     case Map: {
-      return toMap().values();
+      return toQMap().values();
     }break;
     
     case List: {
@@ -1002,6 +1048,53 @@ QVariantList Variant::toList(bool* ok) const
       // Return list with first value being variant value
       QVariantList  ret;
       ret.append(toQVariant());
+      
+      return ret;
+    }break;
+  }
+}
+
+
+QList<Variant> Variant::toList(bool* ok) const
+{
+  if(ok)
+    (*ok) = true;
+  
+  ///@todo Complete switch
+  switch(m_type) {
+    case List: {
+      QList<Variant>  ret;
+      int           idx = 0;
+      
+      // Read list
+      
+      // Format:
+      // [item count][value size][value]...
+      
+      // item count
+      quint64 itemCount = *((quint64*)&(m_data.data()[idx]));
+      idx += sizeof(itemCount);
+      
+      for(int i = 0; i < itemCount; i++) {
+        // Value size
+        quint32 size = *((quint32*)&(m_data.data()[idx]));
+        idx += sizeof(size);
+        
+        // Value
+        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
+        idx = size;
+        
+        ret.append(value);
+      }
+      
+      return ret;
+    }break;
+    
+    default:
+    {
+      // Return list with first value being variant value
+      QList<Variant>  ret;
+      ret.append(*this);
       
       return ret;
     }break;
@@ -1046,10 +1139,10 @@ QVariant Variant::toQVariant(bool* ok) const
       return QVariant(toString(ok));break;
       
     case Variant::Map:
-      return QVariant(toMap(ok));break;
+      return QVariant(toQMap(ok));break;
       
     case Variant::List:
-      return QVariant(toList(ok));break;
+      return QVariant(toQList(ok));break;
       
     
     default: {
@@ -1183,6 +1276,13 @@ Variant Variant::fromMap(const QVariantMap& map)
 
 
 Variant Variant::fromList(const QVariantList& list)
+{
+  return Variant(list);
+}
+
+
+
+Variant Variant::fromList(const QList< Variant >& list)
 {
   return Variant(list);
 }

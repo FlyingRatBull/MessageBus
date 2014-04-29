@@ -44,7 +44,7 @@ PeerObject::~PeerObject()
 // 	qDebug("=== ~PeerObject() ===");
 
 	if(m_socket)
-		m_socket->close();
+		m_socket->disconnectFromServer();
 
 	if(m_peerSocket) {
 		m_peerSocket->close();
@@ -91,10 +91,7 @@ void PeerObject::init(const QString &identifier)
 	connect(m_socket, SIGNAL(readyReadSocketDescriptor()), SLOT(readSocketDescriptor()));
 	connect(m_socket, SIGNAL(disconnected()), SLOT(closeDelayed()));
 
-	m_socket->connectToServer(identifier, QIODevice::ReadWrite);
-// 	qDebug("Peer: connectToServer fired");
-
-	if(!m_socket->waitForConnected()) {
+  if(!m_socket->connectToServer(identifier)) {
 		// m_dbgLog.write("Failed to open LocalSocket for reading!\n");
 		// m_dbgLog.flush();
 		qFatal("Peer: Failed to open LocalSocket for reading!");
@@ -111,7 +108,7 @@ void PeerObject::close(int code)
 	disconnect(m_socket, 0, this, 0);
 	disconnect(m_peerSocket, 0, this, 0);
 
-	m_socket->close();
+	m_socket->disconnectFromServer();
 	m_peerSocket->close();
 
 	if(m_peerSocket->state() != QLocalSocket::UnconnectedState)
@@ -193,7 +190,7 @@ void PeerObject::readData()
 
 	static quint64	totalRead	=	0;
 
-	while(m_socket->bytesAvailable()) {
+	while(m_socket->availableData()) {
 		// Read size
 		quint32	orgSize	=	0;
 		quint32	size		=	0;
@@ -319,7 +316,7 @@ void PeerObject::readPackage()
 
 	static quint64	totalRead	=	0;
 
-	QByteArray	package(m_socket->readPackage());
+	QByteArray	package(m_socket->read().toByteArray());
 
 	if(package.isEmpty()) {
 		qDebug("Peer: PeerObject::readPackage() - zero size data");
@@ -346,7 +343,7 @@ void PeerObject::readPackage()
 
 void PeerObject::readSocketDescriptor()
 {
-	int	fd	=	m_socket->readSocketDescriptor();
+	int	fd	=	m_socket->read().toSocketDescriptor();
 
 // 	qDebug(">>> readSocketDescriptor() : %x", fd);
 

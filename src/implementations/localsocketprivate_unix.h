@@ -24,6 +24,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#ifndef USE_SELECT
+#include <sys/epoll.h>
+#endif
+
 class LocalSocketPrivate_Unix : public LocalSocketPrivate
 {
 	public:
@@ -67,10 +71,21 @@ class LocalSocketPrivate_Unix : public LocalSocketPrivate
 		
 	private:
 		int							m_readBufferSize;
+#ifdef USE_SELECT
 		fd_set					m_readFds;
 		fd_set					m_writeFds;
 		fd_set					m_excFds;
-		struct timeval	m_timeout;
+    struct timeval  m_timeout;
+#else // Use epoll
+    int             m_epollFd_rw;
+    int             m_epollFd_r;
+    int             m_epollFd_w;
+    epoll_event     m_epollEvent_rw;
+    epoll_event     m_epollEvent_r;
+    epoll_event     m_epollEvent_w;
+#define MAX_EPOLL_EVENTS 2
+    epoll_event     m_epollEvents[MAX_EPOLL_EVENTS];
+#endif
 		
 		struct	msghdr	m_msgHeader;
 		struct	iovec		m_iovecData;

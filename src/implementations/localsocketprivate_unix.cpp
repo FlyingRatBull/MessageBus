@@ -23,12 +23,17 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <poll.h>
+#ifdef USE_SELECT
+#include <select.h>
+#endif
 #include <errno.h>
 #include <malloc.h>
 
 LocalSocketPrivate_Unix::LocalSocketPrivate_Unix(LocalSocket* q)
 	:	LocalSocketPrivate(q), m_readBufferSize(0)
+#ifndef USE_SELECT
+  , m_epollFd_rw(0), m_epollFd_r(0), m_epollFd_w(0)
+#endif
 {
 	// Control message needs only space for ine file descriptor
 	m_ccmsgSize	=	CMSG_SPACE(sizeof(quintptr));
@@ -93,6 +98,30 @@ bool LocalSocketPrivate_Unix::setSocketDescriptor(quintptr socketDescriptor)
 		m_readBufferSize	=	tmp - (sizeof(msghdr) + sizeof(iovec) + sizeof(cmsghdr));
 	else
 		m_readBufferSize	=	LocalSocketPrivate::readBufferSize();
+  
+#ifndef USE_SELECT
+  // Init epoll()
+  if(m_epollFd_rw <= 0) {
+    m_epollFd_rw  = epoll_create1(0);
+    m_epollFd_r   = epoll_create1(0);
+    m_epollFd_w   = epoll_create1(0);
+  }
+  
+  m_epollEvent_rw.events  = EPOLLIN | EPOLLOUT;
+  m_epollEvent_r.events   = EPOLLIN;
+  m_epollEvent_w.events   = EPOLLOUT;
+  
+  // Add watched fd
+  if(epoll_ctl(m_epollFd_rw, EPOLL_CTL_ADD, m_socketDescriptor, &m_epollEvent_rw) != 0
+    || epoll_ctl(m_epollFd_r, EPOLL_CTL_ADD, m_socketDescriptor, &m_epollEvent_r) != 0
+    || epoll_ctl(m_epollFd_w, EPOLL_CTL_ADD, m_socketDescriptor, &m_epollEvent_w) != 0
+  ) {
+    close();
+    setError(QString("Cannot set socket descriptor: %1").arg(strerror(errno)));
+    return false;
+  }
+  
+#endif
 
 	setOpened();
 	
@@ -285,10 +314,12 @@ int LocalSocketPrivate_Unix::read(char* data, int size)
 bool LocalSocketPrivate_Unix::waitForReadOrWrite(bool& readyRead, bool& readyWrite, int timeout)
 {
 // 	qDebug("[%p] LocalSocketPrivate_Unix::waitForReadOrWrite()", this);
-	
-	m_timeout.tv_sec	=	(timeout/1000);
-	m_timeout.tv_usec	=	(timeout%1000)*1000;
 
+  // select() is O(n) and has a very limited number of watched fds but is available almost everywhere
+#ifdef USE_SELECT
+  m_timeout.tv_sec  = (timeout/1000);
+  m_timeout.tv_usec = (timeout%1000)*1000;
+  
 	FD_ZERO(&m_readFds);
 	FD_ZERO(&m_writeFds);
 	FD_ZERO(&m_excFds);
@@ -299,8 +330,8 @@ bool LocalSocketPrivate_Unix::waitForReadOrWrite(bool& readyRead, bool& readyWri
 		FD_SET(m_socketDescriptor, &m_writeFds);
 	FD_SET(m_socketDescriptor, &m_excFds);
 	
-	readyRead		=	false;
-	readyWrite	=	false;
+  readyRead   = false;
+  readyWrite  = false;
 
 	int	retval	=	select(m_socketDescriptor+1, &m_readFds, &m_writeFds, &m_excFds, &m_timeout); 
 	
@@ -324,6 +355,39 @@ bool LocalSocketPrivate_Unix::waitForReadOrWrite(bool& readyRead, bool& readyWri
 		setError("Exception in select()");
 		return false;
 	}
+#else // epoll() is O(1) and very scalable for high number of fds but is only available since 2.5.44
+  int nfds  = 0;
+  
+  // Default epoll behaviour is level triggerd so everything is ok
+  if(readyRead && readyWrite)
+    nfds  = epoll_wait(m_epollFd_rw, m_epollEvents, MAX_EPOLL_EVENTS, timeout);
+  else if(readyRead)
+    nfds  = epoll_wait(m_epollFd_r, m_epollEvents, MAX_EPOLL_EVENTS, timeout);
+  else if(readyWrite)
+    nfds  = epoll_wait(m_epollFd_w, m_epollEvents, MAX_EPOLL_EVENTS, timeout);
+
+  readyRead   = false;
+  readyWrite  = false;
+
+  if(nfds < 0) {
+    setError("Exception in epoll()");
+    return false;
+  }
+  
+  // Timeout
+  if(nfds == 0)
+    return true;
+  
+  for(int i = 0; i < nfds; i++) {
+    readyRead   |= ((m_epollEvents[i].events & EPOLLIN) != 0);
+    readyWrite  |= ((m_epollEvents[i].events & EPOLLOUT) != 0);
+    
+    if((m_epollEvents[i].events & (EPOLLERR | EPOLLHUP)) != 0) {
+      setError("Exception in epoll()");
+      return false;
+    }
+  }
+#endif
 	
 	return true;
 }

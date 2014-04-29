@@ -1,1 +1,5 @@
 build/
+/MessageBus.kdev4
+/VERSION.old
+/version.cmake.old
+/version.h.old
