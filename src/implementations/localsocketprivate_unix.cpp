@@ -24,7 +24,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #ifdef USE_SELECT
-#include <select.h>
+#include <poll.h>
 #endif
 #include <errno.h>
 #include <malloc.h>

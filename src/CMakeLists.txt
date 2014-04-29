@@ -78,7 +78,12 @@ add_definitions(-DMSGBUS_DLL)
 
 # Forward definitions
 if(SIGNALS_FROM_THREADS)
-	add_definitions(-DSIGNALS_FROM_THREADS)
+  add_definitions(-DSIGNALS_FROM_THREADS)
+endif()
+
+# Forward definitions
+if(USE_SELECT)
+  add_definitions(-DUSE_SELECT)
 endif()
 
 # Create the actual executable
