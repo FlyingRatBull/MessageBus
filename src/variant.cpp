@@ -97,6 +97,20 @@ Variant::Variant(const QString& string)
 }
 
 
+Variant::Variant(const QVariantMap& map)
+: m_type(Map), m_optId(0)
+{
+  setValue(map);
+}
+
+
+Variant::Variant(const QVariantList& list)
+: m_type(List), m_optId(0)
+{
+  setValue(list);
+}
+
+
 Variant::Variant(bool boolean)
 : m_type(Bool), m_optId(0)
 {
@@ -272,13 +286,25 @@ Variant& Variant::operator = (const QVariant& other)
 		{
 			m_type	=	String;
 			setValue(other.toString());
-		}break;
-		
-		case QVariant::ByteArray:
-		{
-			m_type	=	ByteArray;
-			setValue(other.toByteArray());
-		}break;
+    }break;
+    
+    case QVariant::ByteArray:
+    {
+      m_type  = ByteArray;
+      setValue(other.toByteArray());
+    }break;
+    
+    case QVariant::Map:
+    {
+      m_type  = Map;
+      setValue(other.toMap());
+    }break;
+    
+    case QVariant::List:
+    {
+      m_type  = List;
+      setValue(other.toList());
+    }break;
 		
 		case QVariant::Bool:
 		{
@@ -306,9 +332,25 @@ Variant& Variant::operator = (const QByteArray& other)
 
 Variant& Variant::operator = (const QString& other)
 {
-	m_type	=	String;
-	setValue(other);
-	return *this;
+  m_type  = String;
+  setValue(other);
+  return *this;
+}
+
+
+Variant& Variant::operator = (const QVariantMap& other)
+{
+  m_type  = Map;
+  setValue(other);
+  return *this;
+}
+
+
+Variant& Variant::operator = (const QVariantList& other)
+{
+  m_type  = List;
+  setValue(other);
+  return *this;
 }
 
 
@@ -452,7 +494,81 @@ void Variant::setValue(const QByteArray& data)
 
 void Variant::setValue(const QString& value)
 {
-	m_data	=	value.toUtf8();
+  m_data  = value.toUtf8();
+}
+
+
+void Variant::setValue(const QVariantMap& value)
+{
+  QByteArray  data;
+  QByteArray  key;
+  data.reserve(sizeof(quint64) + value.count() * (sizeof(quint32) * 2 + 32));
+  
+  // Format:
+  // [item count][key size][UTF8 key][value size][value]...
+  
+  // item count
+  quint64 itemCount = value.count();
+  data.resize(data.size() + sizeof(itemCount));
+  *((quint64*)(&(data.data()[data.size() - sizeof(itemCount)]))) = itemCount;
+  
+  QMapIterator<QString, QVariant>   it(value);
+  while(it.hasNext()) {
+    it.next();
+    
+    key = it.key().toUtf8();
+    
+    // key size
+    quint32 size = key.size();
+    data.resize(data.size() + sizeof(size));
+    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;
+    
+    // key
+    data.append(key);
+    
+    QByteArray  value(Variant(it.value()).toByteArray());
+    
+    // value size
+    size = value.size();
+    data.resize(data.size() + sizeof(size));
+    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;
+    
+    // value
+    data.append(value);
+  }
+  
+  m_data  = data;
+}
+
+
+void Variant::setValue(const QVariantList& value)
+{
+  QByteArray  data;
+  QByteArray  key;
+  data.reserve(sizeof(quint64) + value.count() * (sizeof(quint32) * 2 + 32));
+  
+  // Format:
+  // [item count][value size][value]...
+  
+  // item count
+  quint64 itemCount = value.count();
+  data.resize(data.size() + sizeof(itemCount));
+  *((quint64*)(&(data.data()[data.size() - sizeof(itemCount)]))) = itemCount;
+  
+  QListIterator<QVariant>   it(value);
+  while(it.hasNext()) {
+    QByteArray  value(Variant(it.next()).toByteArray());
+    
+    // value size
+    quint32 size = value.size();
+    data.resize(data.size() + sizeof(size));
+    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;
+    
+    // value
+    data.append(value);
+  }
+  
+  m_data  = data;
 }
 
 
@@ -544,6 +660,18 @@ quint64 Variant::toUInt64(bool * ok) const
 		
 		case String:
 			return toString(ok).toULongLong(ok);break;
+      
+    case List: {
+      QVariantList  list(toList(ok));
+      
+      if(ok && !*ok)
+        return 0;
+      
+      if(!list.isEmpty())
+        return list.at(0).toULongLong(ok);
+      
+      return 0;
+    }break;
 
     default:
       return 0;break;
@@ -591,6 +719,20 @@ qint64 Variant::toInt64(bool * ok) const
 		
 		case String:
 			return toString(ok).toLongLong(ok);break;
+      
+      
+      
+    case List: {
+      QVariantList  list(toList(ok));
+      
+      if(ok && !*ok)
+        return 0;
+      
+      if(!list.isEmpty())
+        return list.at(0).toLongLong(ok);
+      
+      return 0;
+    }break;
 
     default:
       return 0; break;
@@ -640,6 +782,44 @@ QString Variant::toString(bool * ok) const
 		{
 			return QString::fromUtf8(m_data);
 		}break;
+    
+    case Map: {
+      QVariantMap map(toMap());
+      QString     ret("{");
+        
+      QMapIterator<QString, QVariant>   it(map);
+      
+      while(it.hasNext()) {
+        it.next();
+        
+        ret += "\"" + it.key() + "\":" + it.value().toString();
+        
+        if(it.hasNext())
+          ret += ",";
+      }
+      
+      ret += "}";
+      
+      return ret;
+    }break;
+    
+    case List: {
+      QVariantList  list(toList());
+      QString       ret("[");
+        
+      QListIterator<QVariant>   it(list);
+        
+      while(it.hasNext()) {
+        ret += it.next().toString();
+        
+        if(it.hasNext())
+          ret += ",";
+      }
+      
+      ret += "]";
+      
+      return ret;
+    }break;
 
 		case Int8:
 		{
@@ -702,6 +882,183 @@ QString Variant::toString(bool * ok) const
 			return QString();
 		}break;
 	}
+}
+
+
+QVariantMap Variant::toMap(bool* ok) const
+{
+  if(ok)
+    (*ok) = true;
+  
+  ///@todo Complete switch
+  switch(m_type) {
+    case Map: {
+      QVariantMap ret;
+      int         idx = 0;
+      
+      // Read map
+      
+      // Format:
+      // [item count][key size][UTF8 key][value size][value]...
+      
+      // item count
+      quint64 itemCount = *((quint64*)&(m_data.data()[idx]));
+      idx += sizeof(itemCount);
+      
+      for(int i = 0; i < itemCount; i++) {
+        // Key size
+        quint32 size = *((quint32*)&(m_data.data()[idx]));
+        idx += sizeof(size);
+        
+        // Key
+        QString key(QString::fromUtf8(m_data.mid(idx, size)));
+        idx = size;
+        
+        // Value size
+        size = *((quint32*)&(m_data.data()[idx]));
+        idx += sizeof(size);
+        
+        // Value
+        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
+        idx = size;
+        
+        ret.insert(key, value.toQVariant());
+      }
+      
+      return ret;
+    }break;
+    
+    case List: {
+      QVariantList  list(toList(ok));
+      QVariantMap   ret;
+      
+      if(ok && !*ok)
+        return ret;
+      
+      QListIterator<QVariant>   it(list);
+      int                       idx = 0;
+      
+      while(it.hasNext()) {
+        ret.insert(QString::number(idx), it.next());
+        
+        ++idx;
+      }
+      
+      return ret;
+    }break;
+    
+    default:
+    {
+      if(ok)
+        (*ok) = false;
+      
+      return QVariantMap();
+    }break;
+  }
+}
+
+
+QVariantList Variant::toList(bool* ok) const
+{
+  if(ok)
+    (*ok) = true;
+  
+  ///@todo Complete switch
+  switch(m_type) {
+    case Map: {
+      return toMap().values();
+    }break;
+    
+    case List: {
+      QVariantList  ret;
+      int           idx = 0;
+      
+      // Read list
+      
+      // Format:
+      // [item count][value size][value]...
+      
+      // item count
+      quint64 itemCount = *((quint64*)&(m_data.data()[idx]));
+      idx += sizeof(itemCount);
+      
+      for(int i = 0; i < itemCount; i++) {
+        // Value size
+        quint32 size = *((quint32*)&(m_data.data()[idx]));
+        idx += sizeof(size);
+        
+        // Value
+        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
+        idx = size;
+        
+        ret.append(value.toQVariant());
+      }
+      
+      return ret;
+    }break;
+    
+    default:
+    {
+      // Return list with first value being variant value
+      QVariantList  ret;
+      ret.append(toQVariant());
+      
+      return ret;
+    }break;
+  }
+}
+
+
+QVariant Variant::toQVariant(bool* ok) const
+{
+  switch(m_type) {
+    case Variant::Bool:
+      return QVariant(toBool(ok));break;
+      
+    case Variant::Int8:
+      return QVariant(toInt8(ok));break;
+      
+    case Variant::Int16:
+      return QVariant(toInt16(ok));break;
+      
+    case Variant::Int32:
+      return QVariant(toInt32(ok));break;
+      
+    case Variant::Int64:
+      return QVariant(toInt64(ok));break;
+      
+    case Variant::UInt8:
+      return QVariant(toUInt8(ok));break;
+      
+    case Variant::UInt16:
+      return QVariant(toUInt16(ok));break;
+      
+    case Variant::UInt32:
+      return QVariant(toUInt32(ok));break;
+      
+    case Variant::UInt64:
+      return QVariant(toUInt64(ok));break;
+      
+    case Variant::ByteArray:
+      return QVariant(toByteArray(ok));break;
+      
+    case Variant::String:
+      return QVariant(toString(ok));break;
+      
+    case Variant::Map:
+      return QVariant(toMap(ok));break;
+      
+    case Variant::List:
+      return QVariant(toList(ok));break;
+      
+    
+    default: {
+      if(ok)
+        *ok = false;
+      
+      return QVariant();
+    }break;
+  }
 }
 
 
@@ -819,6 +1176,18 @@ Variant Variant::fromByteArray(const QByteArray &data)
 }
 
 
+Variant Variant::fromMap(const QVariantMap& map)
+{
+  return Variant(map);
+}
+
+
+Variant Variant::fromList(const QVariantList& list)
+{
+  return Variant(list);
+}
+
+
 bool Variant::operator == (const Variant& other) const
 {
   return (m_type == other.m_type && m_data == other.m_data && m_optId == other.m_optId);
@@ -910,6 +1279,18 @@ qint64 Variant::getIntNumber(quint8 size, bool * ok) const
 		(*ok)	=	false;
 	
 	return 0;
+}
+
+
+void Variant::writeIntelligentNumber(QByteArray& target, quint64 num, quint8 shift)
+{
+  ///@todo Use 2 bits (right shifted by \a shift) to mark size of following integer (8/16/32/64)
+}
+
+
+quint64 Variant::readIntelligentNumber(const QByteArray& source, int idx, int& readBytes)
+{
+
 }
 
 

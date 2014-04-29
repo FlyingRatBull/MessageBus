@@ -19,7 +19,7 @@
 #ifndef PEEROBJECT_H
 #define PEEROBJECT_H
 
-#include <QtCore>
+#include <QtNetwork>
 
 #include "../../localsocket.h"
 #include "../../variant.h"

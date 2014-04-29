@@ -19,11 +19,11 @@
 #ifndef VARIANT_H
 #define VARIANT_H
 
+#include <QString>
+#include <QVariantMap>
+#include <QVariantList>
 #include <QByteArray>
 #include <QMetaType>
-
-class QString;
-class QVariant;
 
 /**
 
@@ -73,7 +73,9 @@ class Variant
 			ByteArray						=	0x09,
 			String							=	0x10,
 			Bool								=	0x11,
-			SocketDescriptor		=	0x12
+			SocketDescriptor		=	0x12,
+			Map                 = 0x13,
+      List                = 0x14
 		};
 		
 	public:
@@ -109,6 +111,10 @@ class Variant
 		Variant(const QString& string);
 		
 		Variant(bool boolean);
+    
+    Variant(const QVariantMap& map);
+    
+    Variant(const QVariantList& list);
 		
 		Variant(const Variant& other);
 		
@@ -123,6 +129,10 @@ class Variant
 		Variant& operator = (const QByteArray& other);
 		
 		Variant& operator = (const QString& other);
+    
+    Variant& operator = (const QVariantMap& other);
+    
+    Variant& operator = (const QVariantList& other);
 		
 		Variant& operator = (bool boolean);
 		
@@ -173,6 +183,10 @@ class Variant
 		void setValue(const QByteArray& value);
 		
 		void setValue(const QString& value);
+    
+    void setValue(const QVariantMap& value);
+    
+    void setValue(const QVariantList& value);
 		
 		void setValue(bool boolean);
 		
@@ -197,6 +211,12 @@ class Variant
 		QByteArray toByteArray(bool * ok = 0) const;
 		
 		QString toString(bool * ok = 0) const;
+    
+    QVariantMap toMap(bool * ok = 0) const;
+    
+    QVariantList toList(bool * ok = 0) const;
+    
+    QVariant toQVariant(bool * ok = 0) const;
 		
 		bool toBool(bool * ok = 0) const;
 
@@ -224,11 +244,19 @@ class Variant
 		static Variant fromByteArray(const QByteArray& data);
 		
 		static Variant fromString(const QString& string);
+    
+    static Variant fromMap(const QVariantMap& map);
+    
+    static Variant fromList(const QVariantList& list);
 		
 	private:
 		quint64 getUIntNumber(quint8 size, bool * ok) const;
 		
 		qint64 getIntNumber(quint8 size, bool * ok) const;
+    
+    void writeIntelligentNumber(QByteArray& target, quint64 num, quint8 shift = 0);
+    
+    quint64 readIntelligentNumber(const QByteArray& source, int idx, int& readBytes);
 		
 	private:
 		Type							m_type;
