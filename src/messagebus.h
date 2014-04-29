@@ -45,6 +45,8 @@ class MessageBus : public QObject
 		bool listen(const QString& filename);
 		
 		bool isOpen() const;
+    
+    QString lastErrorMessage() const;
 		
 	public slots:
 		void deleteLater();
@@ -73,6 +75,7 @@ class MessageBus : public QObject
 		void handlePackage(Variant package);
 
 	private:
+    QString               m_lastError;
 		QObject							*	m_callReceiver;
 		
 		mutable QReadWriteLock				m_socketLock;
@@ -93,3 +96,5 @@ class MessageBus : public QObject
 };
 
 #endif // MESSAGEBUS_H
+
+

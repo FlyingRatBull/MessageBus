@@ -48,8 +48,10 @@ bool MessageBus::connectToServer(const QString& filename)
 {
 	QWriteLocker		socketLocker(&m_socketLock);
 	
-	if(m_peerSocket)
+	if(m_peerSocket) {
+    m_lastError = tr("Already connected to a server");
 		return false;
+  }
 	
 	LocalSocket	*	socket	=	new LocalSocket(this);
 // 	socket->setWritePkgBufferSize(10485760 /* 10M */);
@@ -65,8 +67,10 @@ bool MessageBus::connectToServer(const QString& filename)
 		
 		m_peerSocket	=	socket;
 	}
-	else
+	else {
 		socket->deleteLater();
+    m_lastError = socket->lastErrorString();
+  }
 	
 	return result;
 }
@@ -87,8 +91,10 @@ bool MessageBus::listen(const QString& filename)
 {
 	QWriteLocker		socketLocker(&m_socketLock);
 	
-	if(m_peerSocket || m_server)
+	if(m_peerSocket || m_server) {
+    m_lastError = tr("Already listening on a socket");
 		return false;
+  }
 	
 	m_server	=	new LocalServer(this);
 	
@@ -101,6 +107,7 @@ bool MessageBus::listen(const QString& filename)
 	}
 	else
 	{
+    m_lastError = m_server->errorString();
 		m_server->deleteLater();
 		m_server	=	0;
 	}
@@ -114,6 +121,12 @@ bool MessageBus::isOpen() const
 	QReadLocker		socketLocker(&m_socketLock);
 	
 	return (m_peerSocket && m_peerSocket->isOpen());
+}
+
+
+QString MessageBus::lastErrorMessage() const
+{
+  return m_lastError;
 }
 
 
@@ -137,8 +150,10 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 {
 	QReadLocker		socketLocker(&m_socketLock);
 	
-	if(!m_peerSocket)
+	if(!m_peerSocket) {
+    m_lastError = tr("Not connected to a peer");
 		return false;
+  }
 	
 	/*
 	 * Send CALL package
@@ -149,6 +164,7 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 	
 	if(!writeHelper(package))
 		return false;
+    
 // 	static	int	_cw_count	=	0;
 // 	_cw_count++;
 // 	qDebug("CALL package sent: %d - %s", _cw_count, qPrintable(paramList.first().toString()));
@@ -300,11 +316,16 @@ bool MessageBus::writeHelper(const Variant &package)
 	
 	while(m_peerSocket && !m_peerSocket->write(package))
 	{
-		if(!m_peerSocket->isOpen())
+		if(!m_peerSocket->isOpen()) {
+      m_lastError = tr("Socket already closed while trying to write data");
 			return false;
+    }
 		
 		m_peerSocket->waitForDataWritten(1000);
 	}
+	
+	if(!m_peerSocket)
+    m_lastError = tr("Socket already closed while trying to write data");
 	
 	return (m_peerSocket != 0);
 }
