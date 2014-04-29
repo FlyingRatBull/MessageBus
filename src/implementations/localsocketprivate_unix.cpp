@@ -51,8 +51,7 @@ bool LocalSocketPrivate_Unix::connectToServer(const QString& filename)
 	
 	if(socketDescriptor < 1)
 	{
-		///@todo Analyze errno
-		setError("Cannot open socket!");
+    setError(QString("Cannot open socket: %1").arg(strerror(errno)));
 		return false;
 	}
 	
@@ -63,8 +62,7 @@ bool LocalSocketPrivate_Unix::connectToServer(const QString& filename)
 	
 	if(::connect(socketDescriptor, (sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
 	{
-		///@todo Analyze errno
-		setError("Cannot connect to server!");
+		setError(QString("Cannot connect to server: %1").arg(strerror(errno)));
 		return false;
 	}
 	
@@ -107,8 +105,7 @@ void LocalSocketPrivate_Unix::close()
 	if(m_socketDescriptor && ::close(m_socketDescriptor) != 0)
 	{
 		m_socketDescriptor	=	0;
-		///@todo Analyze errno
-		setError("Could not close socket correctly!");
+    setError(QString("Could not close socket correctly: %1").arg(strerror(errno)));
 	}
 
 	setClosed();
