@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,68 +16,32 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TESTMSGBUS_PEER_H
-#define TESTMSGBUS_PEER_H
+#ifndef TESTMESSAGEBUS_PEER_1_H
+#define TESTMESSAGEBUS_PEER_1_H
 
 #include <QObject>
 
-#include "../../MessageBus"
-#include "../../MessageBusInterface"
+#include "../../variant.h"
+#include "../../messagebus.h"
 
-
-class TestMessageBus_Peer : public QObject
+class TestMessageBus_Peer :  QObject
 {
 	Q_OBJECT
 	
 	public:
-		explicit TestMessageBus_Peer(QObject *parent = 0);
+		TestMessageBus_Peer();
 		
-		virtual ~TestMessageBus_Peer();
-		
-		bool waitForNumCalls(int num, int stepTimeout);
-		
-		MessageBusInterface		*	interface;
-		
-		bool							recall;
-		
-		int								numCalls;
-		QReadWriteLock		numCallsLock;
-		QWaitCondition		numCallsChanged;
-		
-		QList<Variant>		passedArgs;
-		
-		QList<Variant>		retVals;
+		~TestMessageBus_Peer();
 		
 	public slots:
-		void voidCall(MessageBus * src);
-		
-		void voidCall_1(MessageBus * src, const Variant& arg1);
-		
-		void voidCall_2(MessageBus * src, const Variant& arg1, const Variant& arg2);
-		
-		void voidCall_3(MessageBus * src, const Variant& arg1, const Variant& arg2, const Variant& arg3);
-		
-		void voidCall_4(MessageBus * src, const Variant& arg1, const Variant& arg2, const Variant& arg3, const Variant& arg4);
-
-		void retCall(MessageBus *src, Variant *ret);
-		
-		void retCall_1(MessageBus * src, Variant * ret, const Variant& arg1);
-		
-		void retCall_2(MessageBus * src, Variant * ret, const Variant& arg1, const Variant& arg2);
-		
-		void retCall_3(MessageBus * src, Variant * ret, const Variant& arg1, const Variant& arg2, const Variant& arg3);
+		void voidCall(MessageBus * src, const Variant& arg1 = Variant(), const Variant& arg2 = Variant(), const Variant& arg3 = Variant(), const Variant& arg4 = Variant());
 		
 	private slots:
-		void doRecall();
-		
-		void setOrg(MessageBus * org);
+		void onDisconnected();
 		
 	private:
-		void raiseNumCalls();
-		
-	private:
-		MessageBus	*	m_org;
-		QString				m_recallFunction;
+		MessageBus		*	m_bus;
+
 };
 
-#endif // TESTMSGBUS_PEER_H
+#endif // TESTMESSAGEBUS_PEER_1_H

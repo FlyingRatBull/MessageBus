@@ -1,6 +1,6 @@
 /*
  *  MessageBus - Inter process communication library
- *  Copyright (C) 2012  Oliver Becker <der.ole.becker@gmail.com>
+ *  Copyright (C) 2013  Oliver Becker <der.ole.becker@gmail.com>
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,9 +21,10 @@
 
 #include <QtTest>
 
-#include "../../MessageBus"
+#include "../../messagebus.h"
 
 #include "testmessagebus_peer.h"
+#include "../../tsqueue.h"
 
 
 class TestMessageBus : public QObject
@@ -34,99 +35,50 @@ class TestMessageBus : public QObject
 		TestMessageBus();
 		
 	public slots:
-		void voidCall(MessageBus * src);
+		void voidCall(MessageBus * src, const Variant& arg1 = Variant(), const Variant& arg2 = Variant(), const Variant& arg3 = Variant(), const Variant& arg4= Variant());
 		
-		void voidCall_1(MessageBus * src, const Variant& arg1);
-		
-		void voidCall_2(MessageBus * src, const Variant& arg1, const Variant& arg2);
-		
-		void voidCall_3(MessageBus * src, const Variant& arg1, const Variant& arg2, const Variant& arg3);
-		
-		void voidCall_4(MessageBus * src, const Variant& arg1, const Variant& arg2, const Variant& arg3, const Variant& arg4);
+		void newConnection(MessageBus* bus);
 
-		void retCall(MessageBus *src, Variant *ret);
-		
-		void retCall_1(MessageBus * src, Variant * ret, const Variant& arg1);
-		
-		void retCall_2(MessageBus * src, Variant * ret, const Variant& arg1, const Variant& arg2);
-		
-		void retCall_3(MessageBus * src, Variant * ret, const Variant& arg1, const Variant& arg2, const Variant& arg3);
-		
-		void fdCall(MessageBus * src, const Variant& filename, const Variant& fileDescriptor);
-	
 	private slots:
-		void initTestCase();
-		
-		void cleanupTestCase();
-		
 		void init();
 		
 		void cleanup();
 		
 		// Tests
-		void sleep();
+		void fixed_0();
 		
-		void callVoid();
+		void fixed_1();
 		
-		void callVoid_1();
+		void fixed_2();
 		
-		void callVoid_2();
+		void fixed_3();
 		
-		void callVoid_3();
+		void fixed_4();
 		
-		void callVoid_4();
-		
-		void callRet();
-		
-		void callRet_1();
-		
-		void callRet_2();
-		
-		void callRet_3();
-		
-		void callBenchmark();
-		
-// 		void callHeavy();
-		
-		// Data
-		void callVoid_data();
-		
-		void callVoid_1_data();
-		
-		void callVoid_2_data();
-		
-		void callVoid_3_data();
-		
-		void callVoid_4_data();
-		
-		void callRet_data();
-		
-		void callRet_1_data();
-		
-		void callRet_2_data();
-		
-		void callRet_3_data();
-		
-// 		void callHeavy_data();
+		void random();
 		
 	private:
-		void callArgs(int num, bool addCols = true);
-		
-		void callArgs_random(int num);
-		
-		void callArgs_recall(int num, int max);
-		
-		void callArgs(int num, int max, bool recall, bool addCols = true);
+		void test(int min = 0, int max = 4);
 		
 	private:
-		TestMessageBus_Peer			*	m_peer;
+		QList<Variant> generateArgs(int min = 4, int max = 4);
 		
-		MessageBus							*	m_bus;
+	private:
+		QProcess								* m_peerProcess;
 		
-		// Test data
-		int								numCalls;
+		MessageBus									*	m_interface;
+		MessageBus									*	m_bus;
+		QReadWriteLock						m_busLock;
+		QWaitCondition						m_busReady;
 		
-		QList<Variant>		passedArgs;
+		// Transmitted data
+		TsQueue<QList<Variant> >	m_sentData;
+		
+		// Open temp files
+		QHash<quintptr, QFile*>		m_tempFiles;
+		
+		QString										m_failString;
+		int												m_numOpenedFiles;
 };
 
 #endif // TESTMESSAGEBUS_H
