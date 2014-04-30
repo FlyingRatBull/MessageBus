@@ -48,9 +48,10 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	bool	readyRead		=	false;
 	bool	readyWrite	=	false;
 	
-	disableReadNotifier();
-	disableWriteNotifier();
-	disableExceptionNotifier();
+  // Don't disable and reenable the socket notifiers as it seems unneeded, costs a lot of cpu time and blocks at some time (with lots of sockets)
+// 	disableReadNotifier();
+// 	disableWriteNotifier();
+// 	disableExceptionNotifier();
 	
 	QReadLocker		controlLock(&m_controlLock);
 	
@@ -72,9 +73,10 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 			controlLock.relock();
 			if(m_isOpen)
 			{
-				enableReadNotifier();
-				enableWriteNotifier();
-				enableExceptionNotifier();
+        // Don't disable and reenable the socket notifiers as it seems unneeded, costs a lot of cpu time and blocks at some time (with lots of sockets)
+// 				enableReadNotifier();
+// 				enableWriteNotifier();
+// 				enableExceptionNotifier();
 			}
 			
 			return false;
@@ -94,9 +96,10 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	}
 	controlLock.unlock();
 	
-	enableReadNotifier();
-	enableWriteNotifier();
-	enableExceptionNotifier();
+  // Don't disable and reenable the socket notifiers as it seems unneeded, costs a lot of cpu time and blocks at some time (with lots of sockets)
+// 	enableReadNotifier();
+// 	enableWriteNotifier();
+// 	enableExceptionNotifier();
   
 	return readyRead;
 }
