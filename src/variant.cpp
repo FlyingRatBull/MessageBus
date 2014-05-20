@@ -541,7 +541,13 @@ void Variant::setValue(const QVariantMap& value)
     // key
     data.append(key);
     
-    QByteArray  value(Variant(it.value()).toByteArray());
+    Variant     val(Variant(it.value()));
+    QByteArray  value(val.toByteArray());
+    
+    // value type
+    quint16 type = quint16(val.type());
+    data.resize(data.size() + sizeof(type));
+    *((quint16*)(&(data.data()[data.size() - sizeof(type)]))) = type;
     
     // value size
     size = value.size();
@@ -572,12 +578,18 @@ void Variant::setValue(const QVariantList& value)
   
   QListIterator<QVariant>   it(value);
   while(it.hasNext()) {
-    QByteArray  value(Variant(it.next()).toByteArray());
+    Variant     val(Variant(it.next()));
+    QByteArray  value(val.toByteArray());
+    
+    // value type
+    quint16 type = quint16(val.type());
+    data.resize(data.size() + sizeof(type));
+    *((quint16*)(&(data.data()[data.size() - sizeof(type)]))) = type;
     
     // value size
     quint32 size = value.size();
     data.resize(data.size() + sizeof(size));
-    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;
+    *((quint32*)(&(data.data()[data.size() - sizeof(size)]))) = size;    
     
     // value
     data.append(value);
@@ -603,7 +615,13 @@ void Variant::setValue(const QList< Variant >& value)
   
   QListIterator<Variant>   it(value);
   while(it.hasNext()) {
-    QByteArray  value(it.next().toByteArray());
+    Variant     val(it.next());
+    QByteArray  value(val.toByteArray());
+    
+    // value type
+    quint16 type = quint16(val.type());
+    data.resize(data.size() + sizeof(type));
+    *((quint16*)(&(data.data()[data.size() - sizeof(type)]))) = type;
     
     // value size
     quint32 size = value.size();
@@ -951,22 +969,26 @@ QVariantMap Variant::toQMap(bool* ok) const
       quint64 itemCount = *((quint64*)&(m_data.data()[idx]));
       idx += sizeof(itemCount);
       
-      for(int i = 0; i < itemCount; i++) {
+      for(quint64 i = 0; i < itemCount; i++) {
         // Key size
         quint32 size = *((quint32*)&(m_data.data()[idx]));
         idx += sizeof(size);
         
         // Key
         QString key(QString::fromUtf8(m_data.mid(idx, size)));
-        idx = size;
+        idx += size;
+        
+        // Value type
+        quint16 type = *((quint16*)&(m_data.data()[idx]));
+        idx += sizeof(type);
         
         // Value size
         size = *((quint32*)&(m_data.data()[idx]));
         idx += sizeof(size);
         
         // Value
-        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
-        idx = size;
+        Variant value(m_data.mid(idx, size), (Variant::Type)type);
+        idx += size;
         
         ret.insert(key, value.toQVariant());
       }
@@ -1029,13 +1051,17 @@ QVariantList Variant::toQList(bool* ok) const
       idx += sizeof(itemCount);
       
       for(int i = 0; i < itemCount; i++) {
+        // Value type
+        quint16 type = *((quint16*)&(m_data.data()[idx]));
+        idx += sizeof(type);
+        
         // Value size
         quint32 size = *((quint32*)&(m_data.data()[idx]));
         idx += sizeof(size);
         
         // Value
-        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
-        idx = size;
+        Variant value(m_data.mid(idx, size), (Variant::Type)type);
+        idx += size;
         
         ret.append(value.toQVariant());
       }
@@ -1076,13 +1102,17 @@ QList<Variant> Variant::toList(bool* ok) const
       idx += sizeof(itemCount);
       
       for(int i = 0; i < itemCount; i++) {
+        // Value type
+        quint16 type = *((quint16*)&(m_data.data()[idx]));
+        idx += sizeof(type);
+        
         // Value size
         quint32 size = *((quint32*)&(m_data.data()[idx]));
         idx += sizeof(size);
         
         // Value
-        Variant value(Variant::fromByteArray(m_data.mid(idx, size)));
-        idx = size;
+        Variant value(m_data.mid(idx, size), (Variant::Type)type);
+        idx += size;
         
         ret.append(value);
       }
