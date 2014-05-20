@@ -371,7 +371,7 @@ void LocalSocketPrivate::setClosed()
 	m_tempReadBuffer.clear();
 	m_tempReadFileDescBuffer.clear();
 	
-	emit(m_q->disconnected());
+	emit(disconnected());
 }
 
 
@@ -384,7 +384,7 @@ void LocalSocketPrivate::setError(const QString& errorString)
 		m_errorString	=	errorString;
 	}
 	
-	emit(m_q->error(errorString));
+	emit(error(errorString));
 	
 	setClosed();
 }
@@ -413,12 +413,27 @@ void LocalSocketPrivate::readData()
 {
 // 	qDebug("[%p] LocalSocketPrivate::readData()", this);
 	
-	// Resize our read buffer
-	m_currentReadDataBuffer.resize(readBufferSize());
-	
 	// Try to read data
 	disableReadNotifier();
-	int	numRead	=	read(m_currentReadDataBuffer.data(), m_currentReadDataBuffer.size());
+  // Reset data size
+  m_currentReadDataBuffer.data_ptr()->size = 0;
+  int numRead = 0;
+  int nRead   = 0;
+  do {
+    // Resize read buffer
+    if(m_currentReadDataBuffer.isEmpty()) {
+      m_currentReadDataBuffer.resize(1024);
+    } else if (readBufferSize() - m_currentReadDataBuffer.size() < 1024) {
+      // We cannot use additional 1 KiB space anymore
+      break;
+    } else {
+      // Add 1 KiB up to readBufferSize()
+      m_currentReadDataBuffer.resize(m_currentReadDataBuffer.size() + 1024);
+    }
+    
+    nRead	=	read(m_currentReadDataBuffer.data() + m_currentReadDataBuffer.size() - 1024, 1024);
+    numRead += nRead;
+  } while(nRead == 1024);
 	enableReadNotifier();
 	
 	// Handle read data
@@ -490,12 +505,16 @@ void LocalSocketPrivate::readData()
 					m_readBuffer.append(readVar);
 				}
 				// We have read a package
-				emit(m_q->readyRead());
+				emit(readyRead());
 			}
 		}
 	}
 	
 	checkTempReadData(true);
+  
+  // Lower read buffer size
+  if(m_currentReadDataBuffer.size() > 1024)
+    m_currentReadDataBuffer.resize(1024);
 	
 // 	qDebug("[%p] LocalSocketPrivate::~readData()", this);
 }
@@ -601,6 +620,9 @@ void LocalSocketPrivate::writeData()
 				m_currentlyWritingFileDescriptor	=	0;
 			}
 		}
+		
+		// Tell LocalSocket that we have finished writing
+		emit(bytesWritten());
 	}
 
 	// Only enable notifier if we have data to write
@@ -660,6 +682,6 @@ void LocalSocketPrivate::checkTempReadData(bool required)
 			m_readBuffer.append(package);
 		}
 		
-		emit(m_q->readyRead());
+		emit(readyRead());
 	}
 }

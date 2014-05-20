@@ -19,6 +19,8 @@
 #include "localsocket.h"
 
 #include <QThread>
+#include <QTimer>
+#include "eventloop.h"
 
 #if defined(Q_OS_UNIX) || defined(Q_OS_LINX)
 	#include "implementations/localsocketprivate_unix.h"
@@ -34,7 +36,9 @@ LocalSocket::LocalSocket(QObject* parent)
 	#error No implementation of LocalSocket for this operating system!
 #endif
 {
-
+  connect(d_ptr, SIGNAL(readyRead()), SIGNAL(readyRead()));
+  connect(d_ptr, SIGNAL(error(QString)), SIGNAL(error(QString)));
+  connect(d_ptr, SIGNAL(disconnected()), SIGNAL(disconnected()));
 }
 
 LocalSocket::~LocalSocket()
@@ -132,8 +136,21 @@ bool LocalSocket::waitForReadyRead(int timeout)
 	
 	if(timeout < 0)
 		timeout	=	0;
+  
+  // Waiting through event loop
+  QTimer     timeoutTimer;
+  EventLoop  eventLoop;
+  
+  connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
+  connect(d_ptr, SIGNAL(readyRead()), &eventLoop, SLOT(quit()));
+  connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
+  
+  timeoutTimer.setInterval(timeout);
+  timeoutTimer.start();
+  
+  return (eventLoop.exec() == 0);
 	
-	return d_ptr->waitForReadyRead(timer, timeout);
+// 	return d_ptr->waitForReadyRead(timer, timeout);
 }
 
 
@@ -153,8 +170,22 @@ bool LocalSocket::waitForDataWritten(int timeout)
 	
 	if(timeout < 0)
 		timeout	=	0;
+  
+  // Waiting through event loop
+  QTimer     timeoutTimer;
+  EventLoop  eventLoop;
+  
+  connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
+  connect(d_ptr, SIGNAL(bytesWritten()), &eventLoop, SLOT(quit()));
+  connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
+  
+  timeoutTimer.setInterval(timeout);
+  timeoutTimer.start();
+  
+  return (eventLoop.exec() == 0);
+  
 	
-	return d_ptr->waitForDataWritten(timer, timeout);
+// 	return d_ptr->waitForDataWritten(timer, timeout);
 }
 
 

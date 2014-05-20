@@ -7,6 +7,7 @@ set(SOURCES
 	localserver.cpp
 	localsocket.cpp
 	localsocketprivate.cpp
+	eventloop.cpp
 	
  	messagebus.cpp
 	messagebus_p.cpp
@@ -19,6 +20,7 @@ set(HEADERS
 	localserver.h
 	localsocket.h
 	localsocketprivate.h
+	eventloop.h
 
  	messagebus.h
 # 	messagebus_p.h

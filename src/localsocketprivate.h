@@ -77,6 +77,15 @@ class LocalSocketPrivate : public QObject
 		QList<Variant>		m_readBuffer;
 		// Currently writing data (including Variant type and id)
 		QByteArray				m_currentWriteData;
+    
+  signals:
+    void error(const QString& str);
+    
+    void readyRead();
+    
+    void disconnected();
+    
+    void bytesWritten();
 		
 	protected:
 		void enableReadNotifier();
