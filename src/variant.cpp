@@ -20,119 +20,120 @@
 
 #include <QVariant>
 #include <QString>
+#include <unistd.h>
 
 Variant::Variant()
-: m_type(None), m_optId(0)
+: m_type(None), m_optId(0), m_autoCloseAndDup(false)
 {
 }
 
 
 Variant::Variant(Variant::Type type)
-: m_type(type), m_optId(0)
+: m_type(type), m_optId(0), m_autoCloseAndDup(false)
 {
 
 }
 
 
 Variant::Variant(qint8 num)
-: m_type(Int8), m_optId(0)
+: m_type(Int8), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint8 num)
-: m_type(UInt8), m_optId(0)
+: m_type(UInt8), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint16 num)
-: m_type(Int16), m_optId(0)
+: m_type(Int16), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint16 num)
-: m_type(UInt16), m_optId(0)
+: m_type(UInt16), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint32 num)
-: m_type(Int32), m_optId(0)
+: m_type(Int32), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint32 num)
-: m_type(UInt32), m_optId(0)
+: m_type(UInt32), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(qint64 num)
-: m_type(Int64), m_optId(0)
+: m_type(Int64), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(quint64 num)
-: m_type(UInt64), m_optId(0)
+: m_type(UInt64), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(num);
 }
 
 
 Variant::Variant(const QString& string)
-: m_type(String), m_optId(0)
+: m_type(String), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(string);
 }
 
 
 Variant::Variant(const QVariantMap& map)
-: m_type(Map), m_optId(0)
+: m_type(Map), m_optId(0), m_autoCloseAndDup(false)
 {
   setValue(map);
 }
 
 
 Variant::Variant(const QVariantList& list)
-: m_type(List), m_optId(0)
+: m_type(List), m_optId(0), m_autoCloseAndDup(false)
 {
   setValue(list);
 }
 
 
 Variant::Variant(const QList< Variant >& list)
-: m_type(List), m_optId(0)
+: m_type(List), m_optId(0), m_autoCloseAndDup(false)
 {
   setValue(list);
 }
 
 
 Variant::Variant(bool boolean)
-: m_type(Bool), m_optId(0)
+: m_type(Bool), m_optId(0), m_autoCloseAndDup(false)
 {
 	setValue(boolean);
 }
 
 
 Variant::Variant(const QByteArray& data)
-: m_type(ByteArray), m_data(data), m_optId(0)
+: m_type(ByteArray), m_data(data), m_optId(0), m_autoCloseAndDup(false)
 {
 }
 
 
 Variant::Variant(const QByteArray &data, Variant::Type type, quint32 optId)
-: m_type(type), m_data(data), m_optId(optId)
+: m_type(type), m_data(data), m_optId(optId), m_autoCloseAndDup(false)
 {
 }
 
@@ -152,7 +153,9 @@ Variant::Variant(const QVariant& other)
 
 Variant::~Variant()
 {
-
+  if(m_type == SocketDescriptor && m_autoCloseAndDup) {
+    ::close(int(toInt64()));
+  }
 }
 
 
@@ -161,12 +164,22 @@ Variant& Variant::operator = (const Variant& other)
 	m_data	=	other.m_data;
 	m_type	=	other.m_type;
 	m_optId	=	other.m_optId;
+  m_autoCloseAndDup = other.m_autoCloseAndDup;
+  
+  if(m_type == SocketDescriptor && m_autoCloseAndDup) {
+    bool    ok;
+    qint64  old = getIntNumber(sizeof(quint64), &ok);
+    setValue(qint64(dup(int(old))));
+  }
+  
 	return *this;
 }
 
 
 Variant& Variant::operator = (const QVariant& other)
 {
+  m_autoCloseAndDup = false;
+  
 	switch(other.type())
 	{
 		case QVariant::Int:
@@ -331,6 +344,7 @@ Variant& Variant::operator = (const QVariant& other)
 
 Variant& Variant::operator = (const QByteArray& other)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	ByteArray;
 	setValue(other);
 	return *this;
@@ -339,6 +353,7 @@ Variant& Variant::operator = (const QByteArray& other)
 
 Variant& Variant::operator = (const QString& other)
 {
+  m_autoCloseAndDup = false;
   m_type  = String;
   setValue(other);
   return *this;
@@ -347,6 +362,7 @@ Variant& Variant::operator = (const QString& other)
 
 Variant& Variant::operator = (const QVariantMap& other)
 {
+  m_autoCloseAndDup = false;
   m_type  = Map;
   setValue(other);
   return *this;
@@ -355,6 +371,7 @@ Variant& Variant::operator = (const QVariantMap& other)
 
 Variant& Variant::operator = (const QVariantList& other)
 {
+  m_autoCloseAndDup = false;
   m_type  = List;
   setValue(other);
   return *this;
@@ -363,6 +380,7 @@ Variant& Variant::operator = (const QVariantList& other)
 
 Variant& Variant::operator=(const QList< Variant >& other)
 {
+  m_autoCloseAndDup = false;
   m_type  = List;
   setValue(other);
   return *this;
@@ -371,6 +389,7 @@ Variant& Variant::operator=(const QList< Variant >& other)
 
 Variant& Variant::operator = (bool boolean)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	Bool;
 	setValue(boolean);
 	return *this;
@@ -379,6 +398,7 @@ Variant& Variant::operator = (bool boolean)
 
 Variant& Variant::operator = (quint8 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	UInt8;
 	setValue(num);
 	return *this;
@@ -387,6 +407,7 @@ Variant& Variant::operator = (quint8 num)
 
 Variant& Variant::operator = (qint8 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	Int8;
 	setValue(num);
 	return *this;
@@ -395,6 +416,7 @@ Variant& Variant::operator = (qint8 num)
 
 Variant& Variant::operator = (quint16 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	UInt16;
 	setValue(num);
 	return *this;
@@ -403,6 +425,7 @@ Variant& Variant::operator = (quint16 num)
 
 Variant& Variant::operator = (qint16 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	Int16;
 	setValue(num);
 	return *this;
@@ -411,6 +434,7 @@ Variant& Variant::operator = (qint16 num)
 
 Variant& Variant::operator = (quint32 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	UInt32;
 	setValue(num);
 	return *this;
@@ -419,6 +443,7 @@ Variant& Variant::operator = (quint32 num)
 
 Variant& Variant::operator = (qint32 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	Int32;
 	setValue(num);
 	return *this;
@@ -427,6 +452,7 @@ Variant& Variant::operator = (qint32 num)
 
 Variant& Variant::operator = (quint64 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	UInt64;
 	setValue(num);
 	return *this;
@@ -435,6 +461,7 @@ Variant& Variant::operator = (quint64 num)
 
 Variant& Variant::operator = (qint64 num)
 {
+  m_autoCloseAndDup = false;
 	m_type	=	Int64;
 	setValue(num);
 	return *this;
@@ -804,7 +831,7 @@ qint64 Variant::toInt64(bool * ok) const
 }
 
 
-quintptr Variant::toSocketDescriptor(bool *ok) const
+int Variant::toSocketDescriptor(bool *ok) const
 {
 	if(ok)
 		(*ok)	=	false;
@@ -812,8 +839,13 @@ quintptr Variant::toSocketDescriptor(bool *ok) const
 	if(m_type	==	SocketDescriptor)
 	{
 		qint64	ret	=	getIntNumber(sizeof(qint64), ok);
+    
+    if(m_autoCloseAndDup && (!ok || *ok)) {
+      int  newFd = dup(int(ret));
+      return newFd;
+    }
 		
-		return (quintptr)ret;
+		return (int)ret;
 	}
 	
 	return 0;
@@ -1271,11 +1303,12 @@ Variant Variant::fromInt64(qint64 num)
 }
 
 
-Variant Variant::fromSocketDescriptor(quintptr socketDescriptor)
+Variant Variant::fromSocketDescriptor(int socketDescriptor, bool autoCloseAndDup)
 {
 	Variant	ret(SocketDescriptor);
 	ret.setValue((qint64)socketDescriptor);
-	
+  ret.m_autoCloseAndDup = autoCloseAndDup;
+
 	return ret;
 }
 
@@ -1295,7 +1328,13 @@ Variant Variant::fromString(const QString& string)
 
 Variant Variant::fromByteArray(const QByteArray &data)
 {
-	return Variant(data);
+  return Variant(data);
+}
+
+
+Variant Variant::fromByteArray(const char* data, int size)
+{
+  return Variant(QByteArray(data, size));
 }
 
 

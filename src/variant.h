@@ -212,7 +212,7 @@ class Variant
 		
 		quint64 toUInt64(bool * ok = 0) const;
 		
-		quintptr toSocketDescriptor(bool * ok = 0) const;
+		int toSocketDescriptor(bool * ok = 0) const;
 		
 		QByteArray toByteArray(bool * ok = 0) const;
 		
@@ -247,9 +247,11 @@ class Variant
 		
 		static Variant fromInt64(qint64 num);
 		
-		static Variant fromSocketDescriptor(quintptr socketDescriptor);
+		static Variant fromSocketDescriptor(int socketDescriptor, bool autoCloseAndDup = false);
 		
 		static Variant fromByteArray(const QByteArray& data);
+    
+    static Variant fromByteArray(const char* data, int size);
 		
 		static Variant fromString(const QString& string);
     
@@ -272,6 +274,7 @@ class Variant
 		Type							m_type;
 		QByteArray				m_data;
 		quint32						m_optId;
+    bool              m_autoCloseAndDup;
 };
 
 Q_DECLARE_METATYPE(Variant)
