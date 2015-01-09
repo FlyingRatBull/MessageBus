@@ -58,12 +58,18 @@ bool LocalSocketPrivate::waitForReadyRead(QElapsedTimer& timer, int timeout)
 	while(m_isOpen && (timeout > 0 ? timer.elapsed() < timeout : !readyWrite))
 	{
 		controlLock.unlock();
-		QReadLocker		readLocker(&m_writeBufferLock);
-			// Do we need to write?
-			readyWrite	=	(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
-			// We need to read
-			readyRead		=	true;
+    QReadLocker   readLocker(&m_readBufferLock);
+    // We need to read
+    readyRead		=	m_readBuffer.isEmpty();
 		readLocker.unlock();
+    
+    if(!readyRead)
+      return true;
+    
+    QReadLocker   writeLocker(&m_writeBufferLock);
+    // Do we need to write?
+    readyWrite  = (!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty());
+    writeLocker.unlock();
 		
 		bool	ret	=	waitForReadOrWrite(readyRead, readyWrite, (timeout > 0 ? timeout - timer.elapsed() : 0));
 		

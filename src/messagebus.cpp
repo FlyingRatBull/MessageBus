@@ -57,17 +57,16 @@ bool MessageBus::connectToServer(const QString& filename)
 // 	socket->setWritePkgBufferSize(10485760 /* 10M */);
 	
 // 	qDebug("Connecting to: %s", qPrintable(filename));
+  
+  connect(socket, SIGNAL(disconnected()), SLOT(onDisconnected()), Qt::QueuedConnection);
+  connect(socket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
 	
 	bool	result	=	socket->connectToServer(filename);
 	
 	if(result)
-	{
-		connect(socket, SIGNAL(disconnected()), SLOT(onDisconnected()), Qt::QueuedConnection);
-		connect(socket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
-		
 		m_peerSocket	=	socket;
-	}
 	else {
+    disconnect(socket, 0, this, 0);
 		socket->deleteLater();
     m_lastError = socket->lastErrorString();
   }
@@ -97,16 +96,19 @@ bool MessageBus::listen(const QString& filename)
   }
 	
 	m_server	=	new LocalServer(this);
+  
+  connect(m_server, SIGNAL(newConnection(quintptr)), SLOT(onNewClient(quintptr)));
 	
 	bool	result	=	m_server->listen(filename);
 	
 	if(result)
 	{
 // 		qDebug("Listening on %s", qPrintable(filename));
-		connect(m_server, SIGNAL(newConnection(quintptr)), SLOT(onNewClient(quintptr)));
 	}
 	else
 	{
+    disconnect(m_server, 0, this, 0);
+    
     m_lastError = m_server->errorString();
 		m_server->deleteLater();
 		m_server	=	0;
@@ -134,8 +136,10 @@ void MessageBus::deleteLater()
 {
 	QReadLocker		socketLocker(&m_socketLock);
 	
-	if(m_peerSocket)
+	if(m_peerSocket) {
+    disconnect(m_peerSocket, 0, this, 0);
 		m_peerSocket->disconnectFromServer();
+  }
 	
 	m_tmpReadBuffer.clear();
 	m_receivingCallArgs.clear();
@@ -188,9 +192,13 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 	package	=	Variant();
 	// Set id
 	package.setOptionalId(PKG_TYPE_END);
+  
+//   disconnect(m_peerSocket, SIGNAL(readyRead()), this, 0);
 	
-	if(!writeHelper(package))
+	if(!writeHelper(package)) {
+//     connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
 		return false;
+  }
 // 	m_peerSocket->flush();
 // 	qDebug("END package sent");
 	
@@ -198,20 +206,16 @@ bool MessageBus::call(const QString& slot, const QList< Variant >& paramList)
 	 * Wait for ACK package
 	 */
 	{
-		disconnect(m_peerSocket, SIGNAL(readyRead()), this, 0);
-		
 		while(m_peerSocket && m_peerSocket->isOpen() && !checkAckPackage())
-		{
 			m_peerSocket->waitForReadyRead(1000);
-		}
 		
-		connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
+// 		connect(m_peerSocket, SIGNAL(readyRead()), SLOT(onNewPackage()), Qt::QueuedConnection);
 		callSlotQueued(this, "onNewPackage");
 	}
 	//qDebug("Waited for ACK package");
 	
 	// Ack received
-	return true;
+	return m_peerSocket->isOpen();
 }
 
 
@@ -249,18 +253,21 @@ bool MessageBus::call(const QString& slot, const Variant& param1, const Variant&
 void MessageBus::onNewClient(quintptr socketDescriptor)
 {
 	LocalSocket	*	socket	=	new LocalSocket(this);
-	if(!socket->setSocketDescriptor(socketDescriptor))
-	{
-		socket->deleteLater();
-		return;
-	}
-	
 	MessageBus	*	bus	=	new MessageBus(m_callReceiver);
 	bus->m_peerSocket = socket;
 // 	socket->setWritePkgBufferSize(10485760 /* 10M */);
 	
 	connect(socket, SIGNAL(disconnected()), bus, SLOT(onDisconnected()), Qt::QueuedConnection);
 	connect(socket, SIGNAL(readyRead()), bus, SLOT(onNewPackage()), Qt::QueuedConnection);
+  
+  if(!socket->setSocketDescriptor(socketDescriptor))
+  {
+    disconnect(socket, 0, bus, 0);
+    bus->m_peerSocket = nullptr;
+    bus->deleteLater();
+    socket->deleteLater();
+    return;
+  }
 	
 	emit(clientConnected(bus));
 }

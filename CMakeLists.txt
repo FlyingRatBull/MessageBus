@@ -26,6 +26,9 @@ SET(CPACK_SOURCE_PACKAGE_FILE_NAME "MessageBus-${VERSION}-src")
 
 INCLUDE(CPack)
 
+# We need C++11
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 # Don't use QtGui
 set(QT_DONT_USE_QTGUI 1)
 # SET( QT_USE_QTGUI TRUE )

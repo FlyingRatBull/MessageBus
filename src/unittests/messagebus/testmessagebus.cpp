@@ -126,10 +126,12 @@ void TestMessageBus::init()
 	QVERIFY2(m_interface->listen(QDir::tempPath() +  "/test_callbus.sock"), "Cannot create MessageBus-Interface!");
 	
 	connect(m_interface, SIGNAL(clientConnected(MessageBus*)), SLOT(newConnection(MessageBus*)));
+  
+  const QString peerPath = QString(QCoreApplication::applicationFilePath()).replace("test_messagebus", "test_messagebus_peer");
 	
 	m_peerProcess	=	new QProcess();
 	m_peerProcess->setProcessChannelMode(QProcess::ForwardedChannels);
-	m_peerProcess->start(QCoreApplication::applicationFilePath().replace("test_messagebus", "test_messagebus_peer"));
+	m_peerProcess->start(peerPath);
 	
 	QVERIFY2(m_peerProcess->waitForStarted(), "Could not wait for peer process to be started!");
 	
