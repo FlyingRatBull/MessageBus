@@ -67,5 +67,5 @@ target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
 add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 
-add_subdirectory(localsocket)
+# add_subdirectory(localsocket)
 add_subdirectory(messagebus)
