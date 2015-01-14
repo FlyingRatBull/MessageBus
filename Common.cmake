@@ -2,6 +2,8 @@
 enable_testing()
 include(CTest)
 
+include(version.cmake)
+
 if(EXISTS "${PROJECT_SOURCE_DIR}/Definitions.cmake")
 	include("${PROJECT_SOURCE_DIR}/Definitions.cmake")
 endif()
