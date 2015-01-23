@@ -137,20 +137,20 @@ bool LocalSocket::waitForReadyRead(int timeout)
 	if(timeout < 0)
 		timeout	=	0;
   
-  // Waiting through event loop
-  QTimer     timeoutTimer;
-  EventLoop  eventLoop;
-  
-  connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
-  connect(d_ptr, SIGNAL(readyRead()), &eventLoop, SLOT(quit()));
-  connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
-  
-  timeoutTimer.setInterval(timeout);
-  timeoutTimer.start();
-  
-  return (eventLoop.exec() == 0);
+//   // Waiting through event loop
+//   QTimer     timeoutTimer;
+//   EventLoop  eventLoop;
+//   
+//   connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
+//   connect(d_ptr, SIGNAL(readyRead()), &eventLoop, SLOT(quit()));
+//   connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
+//   
+//   timeoutTimer.setInterval(timeout);
+//   timeoutTimer.start();
+//   
+//   return (eventLoop.exec() == 0);
 	
-// 	return d_ptr->waitForReadyRead(timer, timeout);
+	return d_ptr->waitForReadyRead(timer, timeout);
 }
 
 
@@ -171,21 +171,20 @@ bool LocalSocket::waitForDataWritten(int timeout)
 	if(timeout < 0)
 		timeout	=	0;
   
-  // Waiting through event loop
-  QTimer     timeoutTimer;
-  EventLoop  eventLoop;
-  
-  connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
-  connect(d_ptr, SIGNAL(bytesWritten()), &eventLoop, SLOT(quit()));
-  connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
-  
-  timeoutTimer.setInterval(timeout);
-  timeoutTimer.start();
-  
-  return (eventLoop.exec() == 0);
-  
+//   // Waiting through event loop
+//   QTimer     timeoutTimer;
+//   EventLoop  eventLoop;
+//   
+//   connect(&timeoutTimer, SIGNAL(timeout()), &eventLoop, SLOT(abort()));
+//   connect(d_ptr, SIGNAL(bytesWritten()), &eventLoop, SLOT(quit()));
+//   connect(d_ptr, SIGNAL(disconnected()), &eventLoop, SLOT(abort()));
+//   
+//   timeoutTimer.setInterval(timeout);
+//   timeoutTimer.start();
+//   
+//   return (eventLoop.exec() == 0);
 	
-// 	return d_ptr->waitForDataWritten(timer, timeout);
+	return d_ptr->waitForDataWritten(timer, timeout);
 }
 
 
