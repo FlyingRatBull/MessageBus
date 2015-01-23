@@ -371,6 +371,7 @@ void LocalSocketPrivate::setClosed()
 	m_currentWriteData.clear();
 	m_currentWriteDataPos	=	0;
 	m_writeBuffer.clear();
+  writeLocker.unlock();
 	
 	// Clear temporary read data
 	m_currentReadData.clear();
@@ -541,8 +542,6 @@ void LocalSocketPrivate::writeData()
 {
 // 	qDebug("[%p] LocalSocketPrivate::writeData()", this);
 	
-	QReadLocker		readLocker(&m_writeBufferLock);
-	
 	// Move new data into the buffer
 	if(m_currentWriteData.isEmpty())
 	{
@@ -554,7 +553,10 @@ void LocalSocketPrivate::writeData()
 			return;
 		}
 		
+		QReadLocker   readLocker(&m_writeBufferLock);
 		Variant			writeVar(m_writeBuffer.takeFirst());
+    readLocker.unlock();
+    
 		QByteArray	writeVarData(writeVar.toByteArray());
 		quint8			writeVarType			=	quint8(writeVar.type());
 		quint32			writeVarOptId			=	writeVar.optionalId();
@@ -632,8 +634,10 @@ void LocalSocketPrivate::writeData()
 	}
 
 	// Only enable notifier if we have data to write
+	QReadLocker   readLocker(&m_writeBufferLock);
 	if(!m_currentWriteData.isEmpty() || !m_writeBuffer.isEmpty())
 		enableWriteNotifier();
+  readLocker.unlock();
 	
 // 	qDebug("[%p] LocalSocketPrivate::~writeData()", this);
 }
