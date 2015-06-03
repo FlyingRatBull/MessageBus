@@ -25,7 +25,7 @@
 #include "../../tools.h"
 #include "../../variant.h"
 
-QString				TestLocalSocket::s_socketId	=	QString("TestLocalSocket");
+QString				TestLocalSocket::s_socketId	=	QStringLiteral("TestLocalSocket");
 
 
 TestLocalSocket::TestLocalSocket()
@@ -173,7 +173,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	time.start();
 	while(m_localSocket && time.elapsed() < runTime * 1000)
 	{
-		QVERIFY2(m_localSocket->isOpen(), qPrintable(QString("LocalSocket not open! (" + m_localSocket->errorString() + ")")));
+		QVERIFY2(m_localSocket->isOpen(), qPrintable(QStringLiteral("LocalSocket not open! (" + m_localSocket->errorString() + ")")));
 		
 		QChar				command;
 		uchar				action;
@@ -216,7 +216,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					
 					// 				qDebug("Sending data with size %d", dataAr.size());
 					
-					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + hash.toHex() + "\n"), "Could not write data to peer!");
+					QVERIFY2(m_peer->writeControlData(QString(command).toLatin1() + hash.toHex() + "\n"), "Could not write data to peer!");
 					
 					// size
 					quint32	size	=	qToBigEndian<quint32>(dataAr.size());
@@ -237,7 +237,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 						
 // 						if(tmp < 0)
 // 							qDebug("tmp < 0! open: %s", m_localSocket->isOpen() ? "true" : "false");
-						QVERIFY2(tmp >= 0, qPrintable(QString("Could not write all data to peer! (" + m_localSocket->errorString() + ")")));
+						QVERIFY2(tmp >= 0, qPrintable(QStringLiteral("Could not write all data to peer! (" + m_localSocket->errorString() + ")")));
 						
 						written	+=	tmp;
 // 						QCoreApplication::processEvents();
@@ -268,7 +268,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 					QByteArray		hash(QCryptographicHash::hash(dataAr, QCryptographicHash::Md5));
 					command	=	'p';
 					
-					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + hash.toHex() + "\n"), "Could not write data to peer!");
+					QVERIFY2(m_peer->writeControlData(QString(command).toLatin1() + hash.toHex() + "\n"), "Could not write data to peer!");
 					
 					bool result = m_localSocket->writePackage(dataAr);
 					
@@ -291,11 +291,11 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 				// Send file descriptor
 				case 2:
 				{
-					QByteArray		dataAr(filename.toAscii());
+					QByteArray		dataAr(filename.toLatin1());
 					
 					command	=	's';
 					
-					QVERIFY2(m_peer->writeControlData(QString(command).toAscii() + dataAr.toHex() + "\n"), "Could not write data to peer!");
+					QVERIFY2(m_peer->writeControlData(QString(command).toLatin1() + dataAr.toHex() + "\n"), "Could not write data to peer!");
 					QVERIFY2(m_localSocket->writeSocketDescriptor(data.toSocketDescriptor()), "Could not write socket descriptor!");
 					
 					sendCountFD++;
@@ -317,7 +317,7 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 			}
 			
 			QStringList	failures(m_peer->failureMessages());
-			QVERIFY2(failures.isEmpty(), qPrintable(QString("Received failures:\n\t- %1").arg(failures.join("\n\t- "))));
+			QVERIFY2(failures.isEmpty(), qPrintable(QStringLiteral("Received failures:\n\t- %1").arg(failures.join("\n\t- "))));
 	}
 	
 	Logger::log("Written commands (TestLocalSocket)", sendCount, "wB", "Waiting for bytes to be written");
@@ -346,19 +346,19 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	// Send close command
 	// 	qDebug("Sending close command!");
 	Logger::log("Written commands (TestLocalSocket)", sendCount, "sC", "Sent close command");
-	QVERIFY2(m_peer->writeControlData(QString("c\n").toAscii()), "Could not write data to peer!");
+	QVERIFY2(m_peer->writeControlData(QStringLiteral("c\n").toLatin1()), "Could not write data to peer!");
 	
 	QCoreApplication::processEvents();
 	
 	if(!m_peer->waitForTotalSuccessCount(sendCount, 20000))
 	{
 		QStringList	failures(m_peer->failureMessages());
-		QVERIFY2(failures.isEmpty(), qPrintable(QString("Received failures:\n\t- %1").arg(failures.join("\n\t- "))));
+		QVERIFY2(failures.isEmpty(), qPrintable(QStringLiteral("Received failures:\n\t- %1").arg(failures.join("\n\t- "))));
 		
 		if(m_peer->totalSuccessCount() != sendCount)
 			Logger::log("Written commands (TestLocalSocket)", sendCount, "f", "Failed to wait for all return commands");
 		
-		QVERIFY2(m_peer->totalSuccessCount() == sendCount, qPrintable(QString("Invalid return count. Expected: %1; Got: %2").arg(sendCount).arg(m_peer->totalSuccessCount())));
+		QVERIFY2(m_peer->totalSuccessCount() == sendCount, qPrintable(QStringLiteral("Invalid return count. Expected: %1; Got: %2").arg(sendCount).arg(m_peer->totalSuccessCount())));
 	}
 	
 	// Check signal socketDescriptorWritten()
@@ -371,9 +371,9 @@ void TestLocalSocket::runTest(uchar dataAmnt, uchar pkgAmnt, uchar fdAmnt)
 	QList<quintptr>	emittedFdSignals(m_peer->fileDescriptorSignals());
 	
 	for(int i = 0; i < emittedFdSignals.count(); i++)
-		QVERIFY2(neededFdSignals.removeOne(emittedFdSignals[i]), qPrintable(QString("Invalid socketDescriptorWritten() signal")));
+		QVERIFY2(neededFdSignals.removeOne(emittedFdSignals[i]), qPrintable(QStringLiteral("Invalid socketDescriptorWritten() signal")));
 	
-	QVERIFY2(neededFdSignals.isEmpty(), qPrintable(QString("Missing socketDescriptorWritten() signals: %1").arg(neededFdSignals.count())));
+	QVERIFY2(neededFdSignals.isEmpty(), qPrintable(QStringLiteral("Missing socketDescriptorWritten() signals: %1").arg(neededFdSignals.count())));
 	
 	
 	Logger::log("Written commands (TestLocalSocket)", sendCount, "d", "Done");

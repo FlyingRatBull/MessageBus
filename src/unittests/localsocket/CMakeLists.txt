@@ -1,3 +1,7 @@
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Network REQUIRED)
+find_package(Qt5Test REQUIRED)
+
 # Test: LocalSocket
 set(APPNAME "test_localsocket")
 
@@ -31,10 +35,10 @@ set(HEADERS
 )
 
 set(MOC_SRCS)
-QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
+qt5_wrap_cpp(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} Qt5::Core Qt5::Network Qt5::Test)
 add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 set(SOURCES
@@ -62,8 +66,8 @@ set(HEADERS
 )
 
 set(MOC_SRCS)
-QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
+qt5_wrap_cpp(MOC_SRCS ${HEADERS})
 
 add_executable("${APPNAME}_external_peer" ${SOURCES} ${MOC_SRCS})
-target_link_libraries("${APPNAME}_external_peer" ${QT_QTCORE_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries("${APPNAME}_external_peer" Qt5::Core Qt5::Network Qt5::Test)
 add_dependencies(${APPNAME} "${APPNAME}_external_peer")

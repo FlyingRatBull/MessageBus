@@ -44,7 +44,7 @@ LocalServer::~LocalServer()
 bool LocalServer::listen(const QString& filename)
 {
 // 	QDir		tmpDir(QDir::temp());
-// 	QString	filename(tmpDir.absoluteFilePath("LocalSocket_" + QString::fromAscii(QCryptographicHash::hash(filename.toUtf8(), QCryptographicHash::Sha1).toHex()) + ".sock"));
+// 	QString	filename(tmpDir.absoluteFilePath("LocalSocket_" + QString::fromLatin1(QCryptographicHash::hash(filename.toUtf8(), QCryptographicHash::Sha1).toHex()) + ".sock"));
 
 	QLocalServer::removeServer(filename);
 	bool	ret	=	QLocalServer::listen(filename);

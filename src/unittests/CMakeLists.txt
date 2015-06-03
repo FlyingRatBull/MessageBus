@@ -1,4 +1,5 @@
-include_directories(${QT_INCLUDES})
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Test REQUIRED)
 
 # We are in a unit test
 add_definitions(-DUNIT_TEST)
@@ -17,10 +18,10 @@ set(HEADERS
 	)
 
 set(MOC_SRCS)
-QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
+qt5_wrap_cpp(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} Qt5::Core Qt5::Test)
 add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 # Test: Pointer
@@ -39,10 +40,10 @@ set(HEADERS
 	)
 
 set(MOC_SRCS)
-QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
+qt5_wrap_cpp(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} Qt5::Core Qt5::Test)
 add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 # Test: Variant
@@ -60,10 +61,10 @@ testvariant.h
 )
 
 set(MOC_SRCS)
-QT4_WRAP_CPP(MOC_SRCS ${HEADERS})
+qt5_wrap_cpp(MOC_SRCS ${HEADERS})
 
 add_executable(${APPNAME} ${SOURCES} ${MOC_SRCS})
-target_link_libraries(${APPNAME} ${QT_QTCORE_LIBRARY} ${QT_QTTEST_LIBRARY})
+target_link_libraries(${APPNAME} Qt5::Core Qt5::Test)
 add_test(NAME ${APPNAME} COMMAND ${APPNAME} -xunitxml -o "${APPNAME}.xunit.xml")
 
 

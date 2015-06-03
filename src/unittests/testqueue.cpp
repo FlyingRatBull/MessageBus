@@ -44,7 +44,7 @@ void TestQueue::ts_queueItems()
 		
 		QVERIFY(queue.last() == data.at(i));
 		QVERIFY2(queue.count() == i + 1,
-						 qPrintable(QString("Wrong item count! Is %1 - should be %2").arg(queue.count()).arg(i + 1)));
+						 qPrintable(QStringLiteral("Wrong item count! Is %1 - should be %2").arg(queue.count()).arg(i + 1)));
 	}
 	
 	queue.clear();
@@ -105,7 +105,7 @@ void TestQueue::ts_queueData()
 		size	+=	data.at(i).size();
 		
 		QVERIFY2(queue.size() == size,
-						 qPrintable(QString("Wrong data size! Is %1 - should be %2").arg(queue.size()).arg(size)));
+						 qPrintable(QStringLiteral("Wrong data size! Is %1 - should be %2").arg(queue.size()).arg(size)));
 	}
 	
 	queue.clear();
@@ -257,7 +257,7 @@ void TestQueue::ts_queueItems_data()
 	for(int i = 0; i < 10000; i++)
 	{
 		qint64	size	=	(qrand()/(qreal)RAND_MAX)*10000;
-		QString	name	=	QString("%1 bytes").arg(size);
+		QString	name	=	QStringLiteral("%1 bytes").arg(size);
 		
 		QByteArray	data;
 		data.reserve(size);
@@ -309,7 +309,7 @@ void TestQueue::benchmark_data()
 	for(int i = 0; i < 10000; i++)
 	{
 		qint64	size	=	(qrand()/(qreal)RAND_MAX)*100;
-		QString	name	=	QString("%1 bytes").arg(size);
+		QString	name	=	QStringLiteral("%1 bytes").arg(size);
 		
 		QByteArray	data;
 		data.reserve(size);

@@ -353,7 +353,7 @@ void TestLocalSocket_Peer::readControlData()
 		
 		QWriteLocker		locker(&m_recLock);
 		
-		switch(line.at(0).toAscii())
+		switch(line.at(0).toLatin1())
 		{
 			// Failure
 			case 'f':
