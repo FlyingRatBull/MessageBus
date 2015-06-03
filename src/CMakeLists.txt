@@ -1,5 +1,5 @@
-include_directories(${QT_INCLUDES})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Network REQUIRED)
 
 set(APPNAME "${CMAKE_PROJECT_NAME}")
 
@@ -65,15 +65,11 @@ else()
 	message(FATAL_ERROR "No local socket implementation for ${CMAKE_SYSTEM_NAME}!")
 endif()
 
-set(FORMS
-	)
-
 set(RESOURCES
 	)
 
-qt4_wrap_cpp(MOC_SOURCES ${HEADERS})
-qt4_wrap_ui(FORM_SOURCES ${FORMS})
-qt4_add_resources(RES_SOURCES ${RESOURCES})
+qt5_wrap_cpp(MOC_SOURCES ${HEADERS})
+qt5_add_resources(RES_SOURCES ${RESOURCES})
 
 # We are building the library
 add_definitions(-DMSGBUS_DLL)
@@ -90,10 +86,9 @@ endif()
 
 # Create the actual executable
 add_library("${APPNAME}" SHARED ${SOURCES} ${MOC_SOURCES} ${FORM_SOURCES} ${RES_SOURCES})
-target_link_libraries("${APPNAME}" ${QT_QTCORE_LIBRARY}
-	#${QT_QTGUI_LIBRARY}
-	#${QT_QTSQL_LIBRARY}
- 	${QT_QTNETWORK_LIBRARY}
+target_link_libraries("${APPNAME}"
+    Qt5::Core
+    Qt5::Network
 	)
 
 install(TARGETS "${APPNAME}"

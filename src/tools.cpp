@@ -166,17 +166,17 @@ bool callSlot ( QObject * object, const char * slot, QGenericReturnArgument ret,
 		QStringList	list;
 
 		for(int i = 0; i < object->metaObject()->methodCount(); i++)
-			list.append(QString(object->metaObject()->method(i).signature()));
+			list.append(QString(object->metaObject()->method(i).methodSignature()));
 
-		list.append(QString("type = \"%1\"").arg(object->metaObject()->className()));
+		list.append(QStringLiteral("type = \"%1\"").arg(object->metaObject()->className()));
 
-		list.append ( "slot = \"" + QString::fromAscii ( slot + 1) + "\"" );
+		list.append ( "slot = \"" + QString::fromLatin1 ( slot + 1) + "\"" );
 
 		if ( object->metaObject()->indexOfMethod ( QMetaObject::normalizedSignature(slot + 1) ) >= 0 )
 		{
 			list.append ( "method ok" );
 
-			list.append ( "signature = \"" + QString::fromAscii ( met.signature() ) + "\"" );
+			list.append ( "signature = \"" + QString::fromLatin1 ( met.methodSignature() ) + "\"" );
 
 			if ( object->metaObject()->indexOfSlot ( QMetaObject::normalizedSignature(slot + 1) ) >= 0 )
 			{
@@ -231,13 +231,13 @@ bool callSlotBlockingQueued ( QObject * object, const char * slot, QGenericArgum
 
 QString uInt64ToBase64 ( const quint64 number )
 {
-	return QString::fromAscii ( QByteArray ( ( char* ) &number, sizeof ( quint64 ) ).toBase64() );
+	return QString::fromLatin1 ( QByteArray ( ( char* ) &number, sizeof ( quint64 ) ).toBase64() );
 }
 
 
 quint64 base64ToUInt64 ( const QString& string )
 {
-	return * ( ( quint64* ) QByteArray::fromBase64 ( string.toAscii() ).data() );
+	return * ( ( quint64* ) QByteArray::fromBase64 ( string.toLatin1() ).data() );
 }
 
 

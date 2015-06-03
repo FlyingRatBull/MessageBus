@@ -272,7 +272,7 @@ void TestMessageBus::test(int min, int max)
 			sleep(0);
 		}
 		
-		QVERIFY2(m_sentData.count() < oldCount, qPrintable(QString("Failed to wait for new calls (%1/%2 missing)!").arg(m_sentData.count()).arg(count)));
+		QVERIFY2(m_sentData.count() < oldCount, qPrintable(QStringLiteral("Failed to wait for new calls (%1/%2 missing)!").arg(m_sentData.count()).arg(count)));
 	}
 	
 	QVERIFY2(m_tempFiles.isEmpty(), "Still temporary files available!");
@@ -306,7 +306,7 @@ QList< Variant > TestMessageBus::generateArgs(int min, int max)
 			{
 				// Random hash string
 				int	value	=	qrand();
-				tmp	=	QString::fromAscii(QCryptographicHash::hash(QByteArray((const char*)&value, sizeof(value)), QCryptographicHash::Md5).toHex());
+				tmp	=	QString::fromLatin1(QCryptographicHash::hash(QByteArray((const char*)&value, sizeof(value)), QCryptographicHash::Md5).toHex());
 				
 // 				qDebug("Data: %s", qPrintable(tmp.toString()));
 			}break;

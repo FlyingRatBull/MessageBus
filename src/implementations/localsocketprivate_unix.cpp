@@ -56,7 +56,7 @@ bool LocalSocketPrivate_Unix::connectToServer(const QString& filename)
 	
 	if(socketDescriptor < 1)
 	{
-    setError(QString("Cannot open socket: %1").arg(strerror(errno)));
+    setError(QStringLiteral("Cannot open socket: %1").arg(strerror(errno)));
 		return false;
 	}
 	
@@ -67,7 +67,7 @@ bool LocalSocketPrivate_Unix::connectToServer(const QString& filename)
 	
 	if(::connect(socketDescriptor, (sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
 	{
-		setError(QString("Cannot connect to server: %1").arg(strerror(errno)));
+		setError(QStringLiteral("Cannot connect to server: %1").arg(strerror(errno)));
 		return false;
 	}
 	
@@ -117,7 +117,7 @@ bool LocalSocketPrivate_Unix::setSocketDescriptor(quintptr socketDescriptor)
     || epoll_ctl(m_epollFd_w, EPOLL_CTL_ADD, m_socketDescriptor, &m_epollEvent_w) != 0
   ) {
     close();
-    setError(QString("Cannot set socket descriptor: %1").arg(strerror(errno)));
+    setError(QStringLiteral("Cannot set socket descriptor: %1").arg(strerror(errno)));
     return false;
   }
   
@@ -134,7 +134,7 @@ void LocalSocketPrivate_Unix::close()
 	if(m_socketDescriptor && ::close(m_socketDescriptor) != 0)
 	{
 		m_socketDescriptor	=	0;
-    setError(QString("Could not close socket correctly: %1").arg(strerror(errno)));
+    setError(QStringLiteral("Could not close socket correctly: %1").arg(strerror(errno)));
 	}
 
 	setClosed();
@@ -216,7 +216,7 @@ int LocalSocketPrivate_Unix::write(const char* data, int size, quintptr* fileDes
 // 				setClosed();
 // 		}
 // 		else
-			setError(QString("Could not write data: %1").arg(strerror(errno)));
+			setError(QStringLiteral("Could not write data: %1").arg(strerror(errno)));
 
 		return 0;
 	}
@@ -267,7 +267,7 @@ int LocalSocketPrivate_Unix::read(char* data, int size)
 	{
 		// Check errors
 		if(errno!=EAGAIN && errno!=EWOULDBLOCK)
-			setError(QString("Could not read data: %1").arg(QString::fromLocal8Bit(strerror(errno))));
+			setError(QStringLiteral("Could not read data: %1").arg(QString::fromLocal8Bit(strerror(errno))));
 		
 		return 0;
 	}
@@ -282,7 +282,7 @@ int LocalSocketPrivate_Unix::read(char* data, int size)
 		// We couldn't write data => Socket is closed
 		if(numWritten < 0)
 		{
-			setError(QString("Could not read data: %1").arg(QString::fromLocal8Bit(strerror(errno))));
+			setError(QStringLiteral("Could not read data: %1").arg(QString::fromLocal8Bit(strerror(errno))));
 			return 0;
 		}
 		

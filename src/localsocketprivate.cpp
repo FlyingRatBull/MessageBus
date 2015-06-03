@@ -423,7 +423,7 @@ void LocalSocketPrivate::readData()
 	// Try to read data
 	disableReadNotifier();
   // Reset data size
-  m_currentReadDataBuffer.data_ptr()->size = 0;
+  m_currentReadDataBuffer.clear();
   int numRead = 0;
   int nRead   = 0;
   do {

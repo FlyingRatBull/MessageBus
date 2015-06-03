@@ -137,7 +137,7 @@ void PeerObject::readStdin()
 		QString				line(m_peerSocket->readLine());
 
 		QChar					cmd(line.at(0));
-		QByteArray		data(QByteArray::fromHex(line.mid(1).toAscii()));
+		QByteArray		data(QByteArray::fromHex(line.mid(1).toLatin1()));
 
 		// Close?
 		if(cmd == 'c') {
@@ -165,7 +165,7 @@ void PeerObject::readStdin()
 		recCount++;
 		Logger::log("Read commands", recCount);
 // 		m_dbgLog.write("Received: ");
-// 		m_dbgLog.write(QString("(%1) %2").arg(++recCount).arg(cmd).toAscii());
+// 		m_dbgLog.write(QString("(%1) %2").arg(++recCount).arg(cmd).toLatin1());
 // 		m_dbgLog.write(data);
 // 		m_dbgLog.write("\n");
 // 		m_dbgLog.flush();
@@ -185,7 +185,7 @@ void PeerObject::readData()
 {
 // 	static int readCount	=	0;
 // 	m_dbgLog.write("PeerObject::readData()");
-// 	m_dbgLog.write(QString("(%1)\n").arg(++readCount).toAscii());
+// 	m_dbgLog.write(QString("(%1)\n").arg(++readCount).toLatin1());
 // 	m_dbgLog.flush();
 
 	static quint64	totalRead	=	0;
@@ -213,7 +213,7 @@ void PeerObject::readData()
 		if(size == 0) {
 			qDebug("Peer: PeerObject::readData() - zero size data");
 
-			m_peerSocket->write(QString("fReceived zero size").toAscii());
+			m_peerSocket->write(QStringLiteral("fReceived zero size").toLatin1());
 // 			m_peerSocket->flush();
 
 			if(m_close)
@@ -229,7 +229,7 @@ void PeerObject::readData()
 // 		qDebug("PeerObject::readData() - size: %u", size);
 
 		// m_dbgLog.write("Reading: ");
-		// m_dbgLog.write(QString("%1 bytes").arg(size).toAscii());
+		// m_dbgLog.write(QStringLiteral("%1 bytes").arg(size).toLatin1());
 		// m_dbgLog.write("\n");
 		// m_dbgLog.flush();
 
@@ -250,7 +250,7 @@ void PeerObject::readData()
 			tmp	=	m_socket->read(data.data() + read, size - read);
 
 			if(tmp < 0) {
-				m_peerSocket->write(QString("fCould not read data!").toAscii());
+				m_peerSocket->write(QStringLiteral("fCould not read data!").toLatin1());
 // 				m_peerSocket->flush();
 
 				close(1);
@@ -272,7 +272,7 @@ void PeerObject::readData()
 		if(read < size) {
 			qDebug("Peer: PeerObject::readData() - not enough data");
 
-			m_peerSocket->write(QString("fDid not receive enough data. Expected: %1; Got: %2").arg(size).arg(data.size()).toAscii());
+			m_peerSocket->write(QStringLiteral("fDid not receive enough data. Expected: %1; Got: %2").arg(size).arg(data.size()).toLatin1());
 // 			m_peerSocket->flush();
 
 // 			m_dbgLog.write("Did not receive enough data");
@@ -311,7 +311,7 @@ void PeerObject::readPackage()
 {
 	// 	static int readCount	=	0;
 	// 	m_dbgLog.write("PeerObject::readData()");
-	// 	m_dbgLog.write(QString("(%1)\n").arg(++readCount).toAscii());
+	// 	m_dbgLog.write(QString("(%1)\n").arg(++readCount).toLatin1());
 	// 	m_dbgLog.flush();
 
 	static quint64	totalRead	=	0;
@@ -321,7 +321,7 @@ void PeerObject::readPackage()
 	if(package.isEmpty()) {
 		qDebug("Peer: PeerObject::readPackage() - zero size data");
 
-		m_peerSocket->write(QString("fReceived zero size").toAscii());
+		m_peerSocket->write(QStringLiteral("fReceived zero size").toLatin1());
 // 		m_peerSocket->flush();
 
 		if(m_close)
@@ -355,7 +355,7 @@ void PeerObject::readSocketDescriptor()
 		file.seek(0);
 		qDebug("Peer: PeerObject::readSocketDescriptor() - coudl not open file");
 
-		m_peerSocket->write(QString("fReceived invalid file descriptor").toAscii());
+		m_peerSocket->write(QStringLiteral("fReceived invalid file descriptor").toLatin1());
 // 		m_peerSocket->flush();
 
 		if(m_close)
@@ -428,7 +428,7 @@ void PeerObject::checkReadData()
 				return;
 			}
 
-			data	=	m_dataFD.takeFirst().toAscii();
+			data	=	m_dataFD.takeFirst().toLatin1();
 		}
 
 
@@ -449,7 +449,7 @@ void PeerObject::checkReadData()
 // // 			m_dbgLog.write("Invalid data type\n");
 // // 			m_dbgLog.flush();
 //
-// 			m_peerSocket->write(QString("fWaited for %1 but received %2").arg(s_actionTitles[description.first]).arg(s_actionTitles[data.first]).toAscii());
+// 			m_peerSocket->write(QStringLiteral("fWaited for %1 but received %2").arg(s_actionTitles[description.first]).arg(s_actionTitles[data.first]).toLatin1());
 // 			m_peerSocket->flush();
 //
 // 			if(m_close)

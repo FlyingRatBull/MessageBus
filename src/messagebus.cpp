@@ -395,7 +395,7 @@ void MessageBus::handlePackage(Variant package)
 // 			qDebug("CALL package received: clearing");
 			m_receivingCallArgs.clear();
 
-			m_receivingCallSlot	=	package.toString().toAscii();
+			m_receivingCallSlot	=	package.toString().toLatin1();
 // 			if(m_receivingCallSlot.isEmpty())
 // 				qDebug("CALL package received: received empty call slot!");
 		}break;
