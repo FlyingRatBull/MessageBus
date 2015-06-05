@@ -22,11 +22,6 @@
 #include <QObject>
 #include <QEvent>
 
-
-#ifndef QT_DEBUG
-#define qDebug(...)
-#endif
-
 /**
 		*   Call the given \a slot of the \a object directly.
 		*   Use something like Q_ARG(QString, "myString") for the arguments.
